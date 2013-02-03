@@ -33,16 +33,16 @@
 
 #define SLPlayItf_SetPlayState(a, ...) ((*(a))->SetPlayState(a, __VA_ARGS__))
 
-// TODO: Are these sane?
-#define BUFFER_SIZE 8192
 #define BUFFER_COUNT 4
 
 typedef struct sl
 {
-   uint8_t buffer[BUFFER_COUNT][BUFFER_SIZE];
+   uint8_t *buffer[BUFFER_COUNT];
    unsigned buffer_index;
    unsigned buffer_ptr;
    volatile unsigned buffered_blocks;
+   unsigned buf_count;
+   unsigned buf_size;
 
    SLObjectItf engine_object;
    SLEngineItf engine;
@@ -55,7 +55,6 @@ typedef struct sl
    slock_t *lock;
    scond_t *cond;
    bool nonblock;
-   unsigned buf_count;
 } sl_t;
 
 static void opensl_callback(SLAndroidSimpleBufferQueueItf bq, void *ctx)
@@ -97,6 +96,8 @@ static void sl_free(void *data)
    if (sl->cond)
       scond_free(sl->cond);
 
+   for (unsigned i = 0; i < BUFFER_COUNT; i++)
+      free(sl->buffer[i]);
    free(sl);
 }
 
@@ -126,8 +127,9 @@ static void *sl_init(const char *device, unsigned rate, unsigned latency)
    GOTO_IF_FAIL(SLObjectItf_Realize(sl->output_mix, SL_BOOLEAN_FALSE));
 
    sl->buf_count = BUFFER_COUNT;
+   sl->buf_size  = latency * rate * (2 * sizeof(int16_t)) / (1000 * sl->buf_count);
 
-   RARCH_LOG("[SLES] : Setting audio latency (buffer size: [%d])..\n", sl->buf_count * BUFFER_SIZE);
+   RARCH_LOG("[SLES] : Setting audio latency (buffer size: [%d])..\n", sl->buf_count * sl->buf_size);
 
    fmt_pcm.formatType    = SL_DATAFORMAT_PCM;
    fmt_pcm.numChannels   = 2;
@@ -161,11 +163,18 @@ static void *sl_init(const char *device, unsigned rate, unsigned latency)
 
    (*sl->buffer_queue)->RegisterCallback(sl->buffer_queue, opensl_callback, sl);
 
+   for (unsigned i = 0; i < sl->buf_count; i++)
+   {
+      sl->buffer[i] = (uint8_t*)calloc(1, sl->buf_size);
+      if (!sl->buffer[i])
+         goto error;
+   }
+
    // Enqueue a bit to get stuff rolling.
-   sl->buffered_blocks = BUFFER_COUNT;
+   sl->buffered_blocks = sl->buf_count;
    sl->buffer_index = 0;
-   for (unsigned i = 0; i < BUFFER_COUNT; i++)
-      (*sl->buffer_queue)->Enqueue(sl->buffer_queue, sl->buffer[i], BUFFER_SIZE);
+   for (unsigned i = 0; i < sl->buf_count; i++)
+      (*sl->buffer_queue)->Enqueue(sl->buffer_queue, sl->buffer[i], sl->buf_size);
 
    GOTO_IF_FAIL(SLObjectItf_GetInterface(sl->buffer_queue_object, SL_IID_PLAY, &sl->player));
    GOTO_IF_FAIL(SLPlayItf_SetPlayState(sl->player, SL_PLAYSTATE_PLAYING));
@@ -196,7 +205,6 @@ static bool sl_start(void *data)
    return SLPlayItf_SetPlayState(sl->player, SL_PLAYSTATE_PLAYING) == SL_RESULT_SUCCESS;
 }
 
-
 static ssize_t sl_write(void *data, const void *buf_, size_t size)
 {
    sl_t *sl = (sl_t*)data;
@@ -209,7 +217,7 @@ static ssize_t sl_write(void *data, const void *buf_, size_t size)
       slock_lock(sl->lock);
       if (sl->nonblock)
       {
-         if (sl->buffered_blocks == BUFFER_COUNT)
+         if (sl->buffered_blocks == sl->buf_count)
          {
             slock_unlock(sl->lock);
             break;
@@ -217,12 +225,12 @@ static ssize_t sl_write(void *data, const void *buf_, size_t size)
       }
       else
       {
-         while (sl->buffered_blocks == BUFFER_COUNT)
+         while (sl->buffered_blocks == sl->buf_count)
             scond_wait(sl->cond, sl->lock);
       }
       slock_unlock(sl->lock);
 
-      size_t avail_write = min(BUFFER_SIZE - sl->buffer_ptr, size);
+      size_t avail_write = min(sl->buf_size - sl->buffer_ptr, size);
       if (avail_write)
       {
          memcpy(sl->buffer[sl->buffer_index] + sl->buffer_ptr, buf, avail_write);
@@ -232,11 +240,11 @@ static ssize_t sl_write(void *data, const void *buf_, size_t size)
          written        += avail_write;
       }
 
-      if (sl->buffer_ptr >= BUFFER_SIZE)
+      if (sl->buffer_ptr >= sl->buf_size)
       {
          slock_lock(sl->lock);
-         (*sl->buffer_queue)->Enqueue(sl->buffer_queue, sl->buffer[sl->buffer_index], BUFFER_SIZE);
-         sl->buffer_index = (sl->buffer_index + 1) & (BUFFER_COUNT - 1);
+         (*sl->buffer_queue)->Enqueue(sl->buffer_queue, sl->buffer[sl->buffer_index], sl->buf_size);
+         sl->buffer_index = (sl->buffer_index + 1) & (sl->buf_count - 1);
          sl->buffered_blocks++;
          slock_unlock(sl->lock);
          sl->buffer_ptr = 0;
@@ -252,15 +260,15 @@ static size_t sl_write_avail(void *data)
 {
    sl_t *sl = (sl_t*)data;
    slock_lock(sl->lock);
-   size_t avail = (BUFFER_COUNT - (int)sl->buffered_blocks - 1) * BUFFER_SIZE + (BUFFER_SIZE - (int)sl->buffer_ptr);
+   size_t avail = (sl->buf_count - (int)sl->buffered_blocks - 1) * sl->buf_size + (sl->buf_size - (int)sl->buffer_ptr);
    slock_unlock(sl->lock);
    return avail;
 }
 
 static size_t sl_buffer_size(void *data)
 {
-   (void)data;
-   return BUFFER_SIZE * BUFFER_COUNT;
+   sl_t *sl = (sl_t*)data;
+   return sl->buf_size * sl->buf_count;
 }
 
 const audio_driver_t audio_opensl = {
