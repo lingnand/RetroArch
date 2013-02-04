@@ -128,6 +128,7 @@ static void *sl_init(const char *device, unsigned rate, unsigned latency)
 
    sl->buf_count = BUFFER_COUNT;
    sl->buf_size  = latency * rate * (2 * sizeof(int16_t)) / (1000 * sl->buf_count);
+   sl->buf_size &= ~3; // Align buffer size on a sample.
 
    RARCH_LOG("[SLES] : Setting audio latency (buffer size: [%d])..\n", sl->buf_count * sl->buf_size);
 
