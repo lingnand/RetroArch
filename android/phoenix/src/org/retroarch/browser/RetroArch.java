@@ -308,6 +308,7 @@ public class RetroArch extends Activity implements
 	private void updateConfigFile() {
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
 		config.setBoolean("audio_rate_control", prefs.getBoolean("audio_rate_control", true));
+		config.setInt("audio_latency", Integer.valueOf(prefs.getString("audio_latency", "192")));
 		config.setBoolean("audio_enable", prefs.getBoolean("audio_enable", true));
 		config.setBoolean("video_smooth", prefs.getBoolean("video_smooth", true));
 		config.setBoolean("video_allow_rotate", prefs.getBoolean("video_allow_rotate", true));

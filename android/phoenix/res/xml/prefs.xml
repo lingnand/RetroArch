@@ -157,6 +157,12 @@
                 android:key="audio_rate_control"
                 android:summary="Enable dynamic rate control (recommended)."
                 android:title="Dynamic Rate Control" />
+            <EditTextPreference
+                android:key="audio_latency"
+                android:summary="Audio Latency in milliseconds. Increasing this can improve stability, but increase audio latency"
+                android:title="Audio Latency"
+                android:numeric="integer"
+                android:defaultValue="192" />
         </PreferenceCategory>
     </PreferenceScreen>
     <PreferenceScreen android:title="Input Settings" >
