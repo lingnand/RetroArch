@@ -34,6 +34,10 @@
 #include <xmmintrin.h>
 #endif
 
+#ifdef __ALTIVEC__
+#include <altivec.h>
+#endif
+
 // Rough SNR values for upsampling:
 // LOWEST: 40 dB
 // LOWER: 55 dB
@@ -370,12 +374,73 @@ static void process_sinc(rarch_sinc_resampler_t *resamp, float *out_buffer)
    // movehl { X, R, X, L } == { X, R, X, R }
    _mm_store_ss(out_buffer + 1, _mm_movehl_ps(sum, sum));
 }
-#elif defined(HAVE_NEON)
+#elif defined(__ALTIVEC__)
+#define process_sinc_func process_sinc
+static void process_sinc(rarch_sinc_resampler_t *resamp, float *out_buffer)
+{
+   vector float sum_l = vec_splats(0.0f);
+   vector float sum_r = sum_l;
 
+   const float *buffer_l = resamp->buffer_l + resamp->ptr;
+   const float *buffer_r = resamp->buffer_r + resamp->ptr;
+
+   unsigned taps = resamp->taps;
+   unsigned phase = resamp->time >> SUBPHASE_BITS;
+#if SINC_COEFF_LERP
+   const float *phase_table = resamp->phase_table + phase * taps * 2;
+   const float *delta_table = phase_table + taps;
+   vector float deltas = vec_splats((float)(resamp->time & SUBPHASE_MASK) * SUBPHASE_MOD);
+#else
+   const float *phase_table = resamp->phase_table + phase * taps;
+#endif
+
+   vector unsigned char permute = vec_lvsl(0, buffer_l);
+
+   for (unsigned i = 0; i < taps; i += 4)
+   {
+      // Unaligned loads on AltiVec is a bitch. :(
+      vector float buf_l_msq = vec_ld(0, buffer_l);
+      vector float buf_l_lsq = vec_ld(15, buffer_l);
+      vector float buf_r_msq = vec_ld(0, buffer_r);
+      vector float buf_r_lsq = vec_ld(15, buffer_r);
+      vector float buf_l = vec_perm(buf_l_msq, buf_l_lsq, permute);
+      vector float buf_r = vec_perm(buf_r_msq, buf_r_lsq, permute);
+
+#if SINC_COEFF_LERP
+      vector float delta = vec_ld(0, delta_table);
+      vector float phases = vec_ld(0, phase_table);
+      vector float sinc = vec_madd(delta, deltas, phases);
+#else
+      vector float sinc = vec_ld(0, phase_table);
+#endif
+
+      sum_l = vec_madd(sinc, buf_l, sum_l);
+      sum_r = vec_madd(sinc, buf_r, sum_r);
+
+      buffer_l += 4;
+      buffer_r += 4;
+      phase_table += 4;
+#if SINC_COEFF_LERP
+      delta_table += 4;
+#endif
+   }
+
+   union
+   {
+      vector float v;
+      float f[4];
+   } u_l, u_r;
+
+   u_l = sum_l;
+   u_r = sum_r;
+
+   out_buffer[0] = (u_l.f[0] + u_l.f[1]) + (u_l.f[2] + u_l.f[3]);
+   out_buffer[1] = (u_r.f[0] + u_r.f[1]) + (u_r.f[2] + u_r.f[3]);
+}
+#elif defined(HAVE_NEON)
 #if SINC_COEFF_LERP
 #error "NEON asm does not support SINC lerp."
 #endif
-
 // Need to make this function pointer as Android doesn't have built-in targets
 // for NEON and plain ARMv7a.
 static void (*process_sinc_func)(rarch_sinc_resampler_t *resamp, float *out_buffer);
