@@ -431,8 +431,8 @@ static void process_sinc(rarch_sinc_resampler_t *resamp, float *out_buffer)
       float f[4];
    } u_l, u_r;
 
-   u_l = sum_l;
-   u_r = sum_r;
+   u_l.v = sum_l;
+   u_r.v = sum_r;
 
    out_buffer[0] = (u_l.f[0] + u_l.f[1]) + (u_l.f[2] + u_l.f[3]);
    out_buffer[1] = (u_r.f[0] + u_r.f[1]) + (u_r.f[2] + u_r.f[3]);
@@ -554,6 +554,8 @@ static void *resampler_sinc_new(double bandwidth_mod)
    RARCH_LOG("Sinc resampler [AVX]\n");
 #elif defined(__SSE__)
    RARCH_LOG("Sinc resampler [SSE]\n");
+#elif defined(__ALTIVEC__)
+   RARCH_LOG("Sinc resampler [AltiVec]\n");
 #elif defined(HAVE_NEON)
    struct rarch_cpu_features cpu;
    rarch_get_cpu_features(&cpu);
