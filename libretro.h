@@ -27,18 +27,7 @@
 #include <stddef.h>
 #include <limits.h>
 
-// Hack applied for MSVC when compiling in C89 mode as it isn't C99 compliant.
-#ifdef __cplusplus
-extern "C" {
-#else
-#if defined(_MSC_VER) && !defined(SN_TARGET_PS3) && !defined(__cplusplus)
-#define bool unsigned char
-#define true 1
-#define false 0
-#else
-#include <stdbool.h>
-#endif
-#endif
+
 
 // Used for checking API/ABI mismatches that can break libretro implementations.
 // It is not incremented for compatible changes to the API.
@@ -486,7 +475,7 @@ enum retro_mod
                                            // Retrieves the absolute path from where this libretro implementation was loaded.
                                            // NULL is returned if the libretro was loaded statically (i.e. linked statically to frontend), or if the path cannot be determined.
                                            // Mostly useful in cooperation with SET_SUPPORT_NO_GAME as assets can be loaded without ugly hacks.
-                                          
+
 
 // Pass this to retro_video_refresh_t if rendering to hardware.
 // Passing NULL to retro_video_refresh_t is still a frame dupe as normal.
@@ -786,8 +775,5 @@ unsigned retro_get_region(void);
 void *retro_get_memory_data(unsigned id);
 size_t retro_get_memory_size(unsigned id);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif

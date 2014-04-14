@@ -2,7 +2,7 @@
  *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2013 - Daniel De Matteis
  *  Copyright (C) 2012-2013 - Michael Lelli
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -23,11 +23,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifndef __cplusplus
-#include <stdbool.h>
-#else
-extern "C" {
-#endif
+
 
 typedef void (*rgui_file_enum_cb_t)(void *ctx,
       const char *path, unsigned file_type, size_t directory_ptr);
@@ -37,8 +33,7 @@ typedef bool (*rgui_folder_enum_cb_t)(const char *directory,
 extern unsigned RGUI_WIDTH;
 extern unsigned RGUI_HEIGHT;
 
-#ifdef __cplusplus
-}
-#endif
+
+
 #endif
 

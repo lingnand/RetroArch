@@ -22,7 +22,9 @@
 
     <!-- Fourth digit segment of the package version. First three segments are taken from the
          <versionNumber> element.  Must be an integer from 0 to 2^16-1 -->
-    <buildId>2</buildId>
+    <buildId>3</buildId>
+    <author>Justin Tokarchuk</author>
+    <authorId>gYAAgPnNvvslFVmAHJwR3fmCPCc</authorId>
 
     <!-- Description, displayed in the BlackBerry 10 application installer.
          May have multiple values for each language. See samples or xsd schema file. Optional. -->
@@ -30,7 +32,8 @@
     <!--  Name of author which is used for signing. Must match the developer name of your development certificate. -->
 
     <initialWindow>
-        <autoOrients>true</autoOrients>
+        <aspectRatio>portrait</aspectRatio>
+        <autoOrients>false</autoOrients>
         <systemChrome>none</systemChrome>
         <transparent>false</transparent>
     </initialWindow>
@@ -65,11 +68,11 @@
 
     <!-- Application assets -->
     <asset path="../../retroarch.cfg">retroarch.cfg</asset>
-    <asset path="lib">lib</asset>
     <asset path="../../media/overlays">overlays</asset>
     <asset path="assets">assets</asset>
     <asset path="assets/images/icon.png">icon.png</asset>
     <asset path="../../apple/modules">lib</asset>
+    <asset path="lib">lib</asset>
 
     
     <!-- Bright theme is used for this application. --> 

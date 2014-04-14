@@ -16,4 +16,12 @@ TabbedPane {
 
         }
     }
+    
+    Tab {
+        title: "Display"
+        VideoSettings
+        {
+        
+        }
+    }
 }

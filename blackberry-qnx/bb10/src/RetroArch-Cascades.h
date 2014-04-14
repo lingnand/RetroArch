@@ -36,6 +36,8 @@ public:
     Q_INVOKABLE void startEmulator();
     Q_INVOKABLE void findDevices();
     Q_INVOKABLE void discoverController(int player);
+    Q_INVOKABLE void updateOptions(QString property, QString selected);
+    Q_INVOKABLE void OrientationHack();
     void populateCores(core_info_list_t * info);
 
 signals:
@@ -47,6 +49,7 @@ public slots:
 	void aboutToQuit();
 	void onRotationCompleted();
 	void onCoreSelected(QVariant);
+
 
 private:
     /**
@@ -67,6 +70,9 @@ private:
 	QString getRomExtensions();
 
 	void initRASettings();
+
+	void doSettings();
+
 
 	int chid, coid;
 	int state;

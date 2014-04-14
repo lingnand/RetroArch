@@ -5,7 +5,7 @@
 
 #include "ButtonMap.h"
 #include "RetroArch-Cascades.h"
-#include "input/input_common.h"
+#include "../../../input/input_common.h"
 #include "../../frontend_qnx.h"
 
 ButtonMap::ButtonMap(screen_context_t screen_ctx, QString groupId, int coid)

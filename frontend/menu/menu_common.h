@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2013 - Daniel De Matteis
- * 
+ *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -27,11 +27,7 @@
 #define MENU_TEXTURE_FULLSCREEN true
 #endif
 
-#ifndef __cplusplus
-#include <stdbool.h>
-#else
-extern "C" {
-#endif
+
 
 #ifdef HAVE_FILEBROWSER
 #include "utils/file_browser.h"
@@ -297,8 +293,6 @@ void menu_rom_history_push(const char *path, const char *core_path,
       const char *core_name);
 void menu_rom_history_push_current(void);
 
-#ifdef __cplusplus
-}
-#endif
+
 
 #endif
