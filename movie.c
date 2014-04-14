@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -24,16 +24,17 @@
 struct bsv_movie
 {
    FILE *file;
-   uint8_t *state;
-   size_t state_size;
 
    size_t *frame_pos; // A ring buffer keeping track of positions in the file for each frame.
    size_t frame_mask;
    size_t frame_ptr;
 
-   bool playback;
    size_t min_file_pos;
 
+   size_t state_size;
+   uint8_t *state;
+
+   bool playback;
    bool first_rewind;
    bool did_rewind;
 };

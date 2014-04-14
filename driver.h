@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -19,11 +19,12 @@
 
 #include <sys/types.h>
 #include "boolean.h"
-#include "libretro.h"
+#include "libretro_private.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include "msvc/msvc_compat.h"
 #include "gfx/scaler/scaler.h"
+#include "gfx/image/image.h"
 #include "input/overlay.h"
 
 #ifdef HAVE_CONFIG_H
@@ -56,11 +57,8 @@ extern "C" {
 enum // RetroArch specific bind IDs.
 {
    // Custom binds that extend the scope of RETRO_DEVICE_JOYPAD for RetroArch specifically.
-   // Turbo
-   RARCH_TURBO_ENABLE = RARCH_FIRST_CUSTOM_BIND, 
-
    // Analogs (RETRO_DEVICE_ANALOG)
-   RARCH_ANALOG_LEFT_X_PLUS,
+   RARCH_ANALOG_LEFT_X_PLUS = RARCH_FIRST_CUSTOM_BIND,
    RARCH_ANALOG_LEFT_X_MINUS,
    RARCH_ANALOG_LEFT_Y_PLUS,
    RARCH_ANALOG_LEFT_Y_MINUS,
@@ -68,16 +66,9 @@ enum // RetroArch specific bind IDs.
    RARCH_ANALOG_RIGHT_X_MINUS,
    RARCH_ANALOG_RIGHT_Y_PLUS,
    RARCH_ANALOG_RIGHT_Y_MINUS,
-#ifdef RARCH_CONSOLE
-   RARCH_ANALOG_LEFT_X_DPAD_LEFT,
-   RARCH_ANALOG_LEFT_X_DPAD_RIGHT,
-   RARCH_ANALOG_LEFT_Y_DPAD_UP,
-   RARCH_ANALOG_LEFT_Y_DPAD_DOWN,
-   RARCH_ANALOG_RIGHT_X_DPAD_LEFT,
-   RARCH_ANALOG_RIGHT_X_DPAD_RIGHT,
-   RARCH_ANALOG_RIGHT_Y_DPAD_UP,
-   RARCH_ANALOG_RIGHT_Y_DPAD_DOWN,
-#endif
+
+   // Turbo
+   RARCH_TURBO_ENABLE,
 
    RARCH_CUSTOM_BIND_LIST_END,
 
@@ -119,10 +110,35 @@ enum // RetroArch specific bind IDs.
    RARCH_BIND_LIST_END_NULL
 };
 
+#ifdef RARCH_CONSOLE
+enum // Console specific menu bind IDs.
+{
+   CONSOLE_MENU_FIRST      = 61,
+   CONSOLE_MENU_A          = CONSOLE_MENU_FIRST,
+   CONSOLE_MENU_B          = 62,
+   CONSOLE_MENU_X          = 63,
+   CONSOLE_MENU_Y          = 64,
+   CONSOLE_MENU_START      = 65,
+   CONSOLE_MENU_SELECT     = 66,
+   CONSOLE_MENU_UP         = 67,
+   CONSOLE_MENU_DOWN       = 68,
+   CONSOLE_MENU_LEFT       = 69,
+   CONSOLE_MENU_RIGHT      = 70,
+   CONSOLE_MENU_L          = 71,
+   CONSOLE_MENU_R          = 72,
+   CONSOLE_MENU_L2         = 73,
+   CONSOLE_MENU_R2         = 74,
+   CONSOLE_MENU_L3         = 75,
+   CONSOLE_MENU_R3         = 76,
+   CONSOLE_MENU_HOME       = 77,
+   CONSOLE_MENU_LAST       = CONSOLE_MENU_HOME,
+};
+#endif
+
 struct retro_keybind
 {
    bool valid;
-   int id;
+   unsigned id;
    const char *desc;
    enum retro_key key;
 
@@ -134,6 +150,9 @@ struct retro_keybind
    uint64_t def_joykey;
 
    uint32_t joyaxis;
+   uint32_t def_joyaxis;
+
+   uint32_t orig_joyaxis; // Used by input_{push,pop}_analog_dpad().
 };
 
 struct platform_bind
@@ -239,6 +258,7 @@ enum input_devices
    DEVICE_GENERIC_PLAYSTATION2_CONVERTER,
    DEVICE_PSMOVE_NAVI,
    DEVICE_JXD_S7300B,
+   DEVICE_JXD_S7800B,
    DEVICE_IDROID_CON,
    DEVICE_GENIUS_MAXFIRE_G08XU,
    DEVICE_USB_2_AXIS_8_BUTTON_GAMEPAD,
@@ -250,6 +270,7 @@ enum input_devices
    DEVICE_SZMY_POWER_DUAL_BOX_WII,
    DEVICE_ARCHOS_GAMEPAD,
    DEVICE_JXD_S5110,
+   DEVICE_JXD_S5110_SKELROM,
    DEVICE_XPERIA_PLAY,
    DEVICE_BROADCOM_BLUETOOTH_HID,
    DEVICE_THRUST_PREDATOR,
@@ -271,17 +292,26 @@ enum input_devices
    DEVICE_DEFENDER_GAME_RACER_CLASSIC,
    DEVICE_HOLTEK_JC_U912F,
    DEVICE_NVIDIA_SHIELD,
+   DEVICE_MUCH_IREADGO_I5,
+   DEVICE_WIKIPAD,
+   DEVICE_FC30_GAMEPAD,
+   DEVICE_SAMSUNG_GAMEPAD_EIGP20,
 #elif defined(GEKKO)
    DEVICE_GAMECUBE = 0,
 #ifdef HW_RVL
    DEVICE_WIIMOTE,
    DEVICE_NUNCHUK,
    DEVICE_CLASSIC,
+#ifdef HAVE_LIBSICKSAXIS
+   DEVICE_SIXAXIS,
+#endif
 #endif
 #elif defined(_XBOX)
    DEVICE_XBOX_PAD = 0,
 #elif defined(__CELLOS_LV2__)
    DEVICE_SIXAXIS = 0,
+#elif defined(PSP)
+   DEVICE_PSP = 0,
 #elif defined(__BLACKBERRY_QNX__)
    DEVICE_NONE,
    DEVICE_WIIMOTE,
@@ -297,7 +327,7 @@ enum input_devices
    DEVICE_LAST
 };
 
-enum analog_dpad_bind_enums
+enum analog_dpad_mode
 {
    ANALOG_DPAD_NONE = 0,
    ANALOG_DPAD_LSTICK,
@@ -309,8 +339,6 @@ enum analog_dpad_bind_enums
 enum keybind_set_id
 {
    KEYBINDS_ACTION_NONE = 0,
-   KEYBINDS_ACTION_DECREMENT_BIND,
-   KEYBINDS_ACTION_INCREMENT_BIND,
    KEYBINDS_ACTION_SET_DEFAULT_BIND,
    KEYBINDS_ACTION_SET_DEFAULT_BINDS,
    KEYBINDS_ACTION_SET_ANALOG_DPAD_NONE,
@@ -319,6 +347,8 @@ enum keybind_set_id
    KEYBINDS_ACTION_GET_BIND_LABEL,
    KEYBINDS_ACTION_LAST
 };
+
+typedef struct rarch_joypad_driver rarch_joypad_driver_t;
 
 typedef struct input_driver
 {
@@ -329,10 +359,62 @@ typedef struct input_driver
    bool (*key_pressed)(void *data, int key);
    void (*free)(void *data);
    void (*set_keybinds)(void *data, unsigned device, unsigned port, unsigned id, unsigned keybind_action);
+   bool (*set_sensor_state)(void *data, unsigned port, enum retro_sensor_action action, unsigned rate);
+   float (*get_sensor_input)(void *data, unsigned port, unsigned id);
+   uint64_t (*get_capabilities)(void *data);
    const char *ident;
 
    void (*grab_mouse)(void *data, bool state);
+   bool (*set_rumble)(void *data, unsigned port, enum retro_rumble_effect effect, uint16_t state);
+   const rarch_joypad_driver_t *(*get_joypad_driver)(void *data);
 } input_driver_t;
+
+typedef struct input_osk_driver
+{
+   void *(*init)(size_t size);
+   void (*free)(void *data);
+   bool (*enable_key_layout)(void *data);
+   void (*oskutil_create_activation_parameters)(void *data);
+   void (*write_msg)(void *data, const void *msg);
+   void (*write_initial_msg)(void *data, const void *msg);
+   bool (*start)(void *data);
+   void (*lifecycle)(void *data, uint64_t status);
+   void *(*get_text_buf)(void *data);
+   const char *ident;
+} input_osk_driver_t;
+
+typedef struct camera_driver
+{
+   // FIXME: params for init - queries for resolution, framerate, color format
+   // which might or might not be honored
+   void *(*init)(const char *device, uint64_t buffer_types, unsigned width, unsigned height);
+   void (*free)(void *data);
+
+   bool (*start)(void *data);
+   void (*stop)(void *data);
+
+   // Polls the camera driver.
+   // Will call the appropriate callback if a new frame is ready.
+   // Returns true if a new frame was handled.
+   bool (*poll)(void *data,
+         retro_camera_frame_raw_framebuffer_t frame_raw_cb,
+         retro_camera_frame_opengl_texture_t frame_gl_cb);
+
+   const char *ident;
+} camera_driver_t;
+
+typedef struct location_driver
+{
+   void *(*init)(void);
+   void (*free)(void *data);
+
+   bool (*start)(void *data);
+   void (*stop)(void *data);
+
+   bool (*get_position)(void *data, double *lat, double *lon, double *horiz_accuracy, double *vert_accuracy);
+   void (*set_interval)(void *data, unsigned interval_msecs, unsigned interval_distance);
+   const char *ident;
+} location_driver_t;
 
 struct rarch_viewport;
 
@@ -340,11 +422,11 @@ struct rarch_viewport;
 typedef struct video_overlay_interface
 {
    void (*enable)(void *data, bool state);
-   bool (*load)(void *data, const uint32_t *image, unsigned width, unsigned height);
-   void (*tex_geom)(void *data, float x, float y, float w, float h);
-   void (*vertex_geom)(void *data, float x, float y, float w, float h);
+   bool (*load)(void *data, const struct texture_image *images, unsigned num_images);
+   void (*tex_geom)(void *data, unsigned image, float x, float y, float w, float h);
+   void (*vertex_geom)(void *data, unsigned image, float x, float y, float w, float h);
    void (*full_screen)(void *data, bool enable);
-   void (*set_alpha)(void *data, float mod);
+   void (*set_alpha)(void *data, unsigned image, float mod);
 } video_overlay_interface_t;
 #endif
 
@@ -359,7 +441,7 @@ typedef struct video_poke_interface
    void (*set_aspect_ratio)(void *data, unsigned aspectratio_index);
    void (*apply_state_changes)(void *data);
 
-#if defined(HAVE_RGUI) || defined(HAVE_RMENU)
+#ifdef HAVE_MENU
    void (*set_texture_frame)(void *data, const void *frame, bool rgb32, unsigned width, unsigned height, float alpha); // Update texture.
    void (*set_texture_enable)(void *data, bool enable, bool full_screen); // Enable/disable rendering.
 #endif
@@ -383,8 +465,7 @@ typedef struct video_driver
    void (*free)(void *data);
    const char *ident;
 
-#if defined(HAVE_RMENU) || defined(HAVE_RGUI)
-   void (*start)(void);
+#ifdef HAVE_MENU
    void (*restart)(void);
 #endif
 
@@ -400,6 +481,24 @@ typedef struct video_driver
    void (*poke_interface)(void *data, const video_poke_interface_t **iface);
 } video_driver_t;
 
+typedef struct menu_ctx_driver
+{
+   void  (*set_texture)(void*, bool);
+   void  (*render_messagebox)(void*, const char*);
+   void  (*render)(void*);
+   void  (*frame)(void*);
+   void* (*init)(void);
+   void  (*free)(void*);
+   void  (*init_assets)(void*);
+   void  (*free_assets)(void*);
+   void  (*populate_entries)(void*, unsigned);
+   void  (*iterate)(void*, unsigned);
+   int   (*input_postprocess)(void *, uint64_t);
+
+   // Human readable string.
+   const char *ident;
+} menu_ctx_driver_t;
+
 enum rarch_display_type
 {
    RARCH_DISPLAY_NONE = 0, // Non-bindable types like consoles, KMS, VideoCore, etc.
@@ -413,11 +512,31 @@ typedef struct driver
    const audio_driver_t *audio;
    const video_driver_t *video;
    const input_driver_t *input;
+#ifdef HAVE_OSK
+   const input_osk_driver_t *osk;
+   void *osk_data;
+#endif
+#ifdef HAVE_CAMERA
+   const camera_driver_t *camera;
+   void *camera_data;
+#endif
+#ifdef HAVE_LOCATION
+   const location_driver_t *location;
+   void *location_data;
+#endif
    void *audio_data;
    void *video_data;
    void *input_data;
+#ifdef HAVE_MENU
+   const menu_ctx_driver_t *menu_ctx;
+#endif
 
    bool threaded_video;
+
+   // If set during context deinit, the driver should keep
+   // graphics context alive to avoid having to reset all context state.
+   bool video_cache_context;
+   bool video_cache_context_ack; // Set to true by driver if context caching succeeded.
 
    // Set if the respective handles are owned by RetroArch driver core.
    // Consoles upper logic will generally intialize the drivers before
@@ -429,12 +548,22 @@ typedef struct driver
    bool video_data_own;
    bool audio_data_own;
    bool input_data_own;
+#ifdef HAVE_CAMERA
+   bool camera_data_own;
+#endif
+#ifdef HAVE_LOCATION
+   bool location_data_own;
+#endif
+#ifdef HAVE_OSK
+   bool osk_data_own;
+#endif
 
 #ifdef HAVE_COMMAND
    rarch_cmd_t *command;
 #endif
    bool stdin_claimed;
    bool block_hotkey;
+   bool block_input;
    bool nonblock_state;
 
    // Opaque handles to currently running window.
@@ -457,7 +586,7 @@ typedef struct driver
 
 #ifdef HAVE_OVERLAY
    input_overlay_t *overlay;
-   uint64_t overlay_state;
+   input_overlay_state_t overlay_state;
 #endif
 
    // Interface for "poking".
@@ -479,6 +608,29 @@ void uninit_video_input(void);
 void init_audio(void);
 void uninit_audio(void);
 
+void find_prev_resampler_driver(void);
+void find_prev_video_driver(void);
+void find_prev_audio_driver(void);
+void find_prev_input_driver(void);
+void find_next_video_driver(void);
+void find_next_audio_driver(void);
+void find_next_input_driver(void);
+void find_next_resampler_driver(void);
+
+#ifdef HAVE_CAMERA
+void init_camera(void);
+void uninit_camera(void);
+void find_prev_camera_driver(void);
+void find_next_camera_driver(void);
+#endif
+
+#ifdef HAVE_LOCATION
+void init_location(void);
+void uninit_location(void);
+void find_prev_location_driver(void);
+void find_next_location_driver(void);
+#endif
+
 void driver_set_monitor_refresh_rate(float hz);
 bool driver_monitor_fps_statistics(double *refresh_rate, double *deviation, unsigned *sample_points);
 void driver_set_nonblock_state(bool nonblock);
@@ -486,6 +638,37 @@ void driver_set_nonblock_state(bool nonblock);
 // Used by RETRO_ENVIRONMENT_SET_HW_RENDER.
 uintptr_t driver_get_current_framebuffer(void);
 retro_proc_address_t driver_get_proc_address(const char *sym);
+
+// Used by RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE
+bool driver_set_rumble_state(unsigned port, enum retro_rumble_effect effect, uint16_t strength);
+// Used by RETRO_ENVIRONMENT_GET_SENSOR_INTERFACE
+bool driver_set_sensor_state(unsigned port, enum retro_sensor_action action, unsigned rate);
+float driver_sensor_get_input(unsigned port, unsigned action);
+
+// Used by RETRO_ENVIRONMENT_GET_CAMERA_INTERFACE
+#ifdef HAVE_CAMERA
+bool driver_camera_start(void);
+void driver_camera_stop(void);
+void driver_camera_poll(void);
+#endif
+
+// Used by RETRO_ENVIRONMENT_GET_LOCATION_INTERFACE
+#ifdef HAVE_LOCATION
+bool driver_location_start(void);
+void driver_location_stop(void);
+bool driver_location_get_position(double *lat, double *lon, double *horiz_accuracy, double *vert_accuracy);
+void driver_location_set_interval(unsigned interval_msecs, unsigned interval_distance);
+#endif
+
+#ifdef HAVE_MENU
+const void *menu_ctx_find_driver(const char *ident); // Finds driver with ident. Does not initialize.
+bool menu_ctx_init_first(const menu_ctx_driver_t **driver, void **handle); // Finds first suitable driver and initializes.
+void find_prev_menu_driver(void);
+void find_next_menu_driver(void);
+#endif
+
+// Used by RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO
+bool driver_update_system_av_info(const struct retro_system_av_info *info);
 
 extern driver_t driver;
 
@@ -506,11 +689,13 @@ extern const audio_driver_t audio_coreaudio;
 extern const audio_driver_t audio_xenon360;
 extern const audio_driver_t audio_ps3;
 extern const audio_driver_t audio_gx;
+extern const audio_driver_t audio_psp1;
+extern const audio_driver_t audio_rwebaudio;
 extern const audio_driver_t audio_null;
 extern const video_driver_t video_gl;
 extern const video_driver_t video_psp1;
 extern const video_driver_t video_vita;
-extern const video_driver_t video_d3d9;
+extern const video_driver_t video_d3d;
 extern const video_driver_t video_gx;
 extern const video_driver_t video_xenon360;
 extern const video_driver_t video_xvideo;
@@ -518,6 +703,7 @@ extern const video_driver_t video_xdk_d3d;
 extern const video_driver_t video_sdl;
 extern const video_driver_t video_vg;
 extern const video_driver_t video_null;
+extern const video_driver_t video_lima;
 extern const video_driver_t video_omap;
 extern const input_driver_t input_android;
 extern const input_driver_t input_sdl;
@@ -529,9 +715,23 @@ extern const input_driver_t input_xenon360;
 extern const input_driver_t input_gx;
 extern const input_driver_t input_xinput;
 extern const input_driver_t input_linuxraw;
+extern const input_driver_t input_udev;
 extern const input_driver_t input_apple;
 extern const input_driver_t input_qnx;
+extern const input_driver_t input_rwebinput;
 extern const input_driver_t input_null;
+extern const camera_driver_t camera_v4l2;
+extern const camera_driver_t camera_android;
+extern const camera_driver_t camera_rwebcam;
+extern const camera_driver_t camera_ios;
+extern const location_driver_t location_apple;
+extern const location_driver_t location_android;
+extern const input_osk_driver_t input_ps3_osk;
+
+extern const menu_ctx_driver_t menu_ctx_rmenu;
+extern const menu_ctx_driver_t menu_ctx_rmenu_xui;
+extern const menu_ctx_driver_t menu_ctx_rgui;
+extern const menu_ctx_driver_t menu_ctx_lakka;
 
 #include "driver_funcs.h"
 

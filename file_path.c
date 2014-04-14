@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -13,16 +13,17 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "file.h"
-#include "general.h"
+#include "file_path.h"
 #include <stdlib.h>
 #include "boolean.h"
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 #include "compat/strl.h"
 #include "compat/posix_string.h"
+#include "miscellaneous.h"
 
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__) || defined(__BLACKBERRY_QNX__)
+#if (defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)) || defined(__BLACKBERRY_QNX__) || defined(PSP)
 #include <unistd.h> //stat() is defined here
 #endif
 
@@ -38,12 +39,14 @@
 #ifdef _MSC_VER
 #define setmode _setmode
 #endif
+#include "msvc/msvc_compat.h"
 #ifdef _XBOX
 #include <xtl.h>
 #define INVALID_FILE_ATTRIBUTES -1
 #else
 #include <io.h>
 #include <fcntl.h>
+#include <direct.h>
 #include <windows.h>
 #endif
 #else
@@ -53,12 +56,111 @@
 #include <unistd.h>
 #endif
 
+// Dump stuff to file.
+bool write_file(const char *path, const void *data, size_t size)
+{
+   FILE *file = fopen(path, "wb");
+   if (!file)
+      return false;
+   else
+   {
+      bool ret = fwrite(data, 1, size, file) == size;
+      fclose(file);
+      return ret;
+   }
+}
+
+// Generic file loader.
+long read_file(const char *path, void **buf)
+{
+   long rc = 0, len = 0;
+   void *rom_buf = NULL;
+   FILE *file = fopen(path, "rb");
+
+   if (!file)
+      goto error;
+
+   fseek(file, 0, SEEK_END);
+   len = ftell(file);
+   rewind(file);
+   rom_buf = malloc(len + 1);
+   if (!rom_buf)
+   {
+      RARCH_ERR("Couldn't allocate memory.\n");
+      goto error;
+   }
+
+   if ((rc = fread(rom_buf, 1, len, file)) < len)
+      RARCH_WARN("Didn't read whole file.\n");
+
+   *buf = rom_buf;
+   // Allow for easy reading of strings to be safe.
+   // Will only work with sane character formatting (Unix).
+   ((char*)rom_buf)[len] = '\0';
+   fclose(file);
+   return rc;
+
+error:
+   if (file)
+      fclose(file);
+   free(rom_buf);
+   *buf = NULL;
+   return -1;
+}
+
+// Reads file content as one string.
+bool read_file_string(const char *path, char **buf)
+{
+   *buf = NULL;
+   FILE *file = fopen(path, "r");
+   long len = 0;
+   char *ptr = NULL;
+
+   if (!file)
+      goto error;
+
+   // ftell with "r" can be troublesome ...
+   // Haven't run into issues yet though.
+   fseek(file, 0, SEEK_END);
+   len = ftell(file) + 2; // Takes account of being able to read in EOF and '\0' at end.
+   rewind(file);
+
+   *buf = (char*)calloc(len, sizeof(char));
+   if (!*buf)
+      goto error;
+
+   ptr = *buf;
+
+   while (ptr && !feof(file))
+   {
+      size_t bufsize = (size_t)(((ptrdiff_t)*buf + (ptrdiff_t)len) - (ptrdiff_t)ptr);
+      fgets(ptr, bufsize, file);
+
+      ptr += strlen(ptr);
+   }
+
+   ptr = strchr(ptr, EOF);
+   if (ptr)
+      *ptr = '\0';
+
+   fclose(file);
+   return true;
+
+error:
+   if (file)
+      fclose(file);
+   if (*buf)
+      free(*buf);
+   return false;
+}
+
 void string_list_free(struct string_list *list)
 {
+   size_t i;
    if (!list)
       return;
 
-   for (size_t i = 0; i < list->size; i++)
+   for (i = 0; i < list->size; i++)
       free(list->elems[i].data);
    free(list->elems);
    free(list);
@@ -77,7 +179,7 @@ static bool string_list_capacity(struct string_list *list, size_t cap)
    return true;
 }
 
-static struct string_list *string_list_new(void)
+struct string_list *string_list_new(void)
 {
    struct string_list *list = (struct string_list*)calloc(1, sizeof(*list));
    if (!list)
@@ -92,7 +194,7 @@ static struct string_list *string_list_new(void)
    return list;
 }
 
-static bool string_list_append(struct string_list *list, const char *elem, union string_list_elem_attr attr)
+bool string_list_append(struct string_list *list, const char *elem, union string_list_elem_attr attr)
 {
    if (list->size >= list->cap &&
          !string_list_capacity(list, list->cap * 2))
@@ -107,6 +209,28 @@ static bool string_list_append(struct string_list *list, const char *elem, union
 
    list->size++;
    return true;
+}
+
+void string_list_set(struct string_list *list, unsigned index, const char *str)
+{
+   free(list->elems[index].data);
+   rarch_assert(list->elems[index].data = strdup(str));
+}
+
+void string_list_join_concat(char *buffer, size_t size, const struct string_list *list, const char *sep)
+{
+   size_t len = strlen(buffer);
+   rarch_assert(len < size);
+   buffer += len;
+   size -= len;
+
+   size_t i;
+   for (i = 0; i < list->size; i++)
+   {
+      strlcat(buffer, list->elems[i].data, size);
+      if ((i + 1) < list->size)
+         strlcat(buffer, sep, size);
+   }
 }
 
 struct string_list *string_split(const char *str, const char *delim)
@@ -146,10 +270,11 @@ error:
 
 bool string_list_find_elem(const struct string_list *list, const char *elem)
 {
+   size_t i;
    if (!list)
       return false;
 
-   for (size_t i = 0; i < list->size; i++)
+   for (i = 0; i < list->size; i++)
    {
       if (strcasecmp(list->elems[i].data, elem) == 0)
          return true;
@@ -160,13 +285,14 @@ bool string_list_find_elem(const struct string_list *list, const char *elem)
 
 bool string_list_find_elem_prefix(const struct string_list *list, const char *prefix, const char *elem)
 {
+   size_t i;
    if (!list)
       return false;
 
    char prefixed[PATH_MAX];
    snprintf(prefixed, sizeof(prefixed), "%s%s", prefix, elem);
 
-   for (size_t i = 0; i < list->size; i++)
+   for (i = 0; i < list->size; i++)
    {
       if (strcasecmp(list->elems[i].data, elem) == 0 ||
             strcasecmp(list->elems[i].data, prefixed) == 0)
@@ -178,11 +304,19 @@ bool string_list_find_elem_prefix(const struct string_list *list, const char *pr
 
 const char *path_get_extension(const char *path)
 {
-   const char *ext = strrchr(path, '.');
+   const char *ext = strrchr(path_basename(path), '.');
    if (ext)
       return ext + 1;
    else
       return "";
+}
+
+char *path_remove_extension(char *path)
+{
+   char *last = (char*)strrchr(path_basename(path), '.');
+   if (*last)
+      *last = '\0';
+   return last;
 }
 
 static int qstrcmp_plain(const void *a_, const void *b_)
@@ -407,7 +541,7 @@ void fill_pathname(char *out_path, const char *in_path, const char *replace, siz
    char tmp_path[PATH_MAX];
 
    rarch_assert(strlcpy(tmp_path, in_path, sizeof(tmp_path)) < sizeof(tmp_path));
-   char *tok = strrchr(tmp_path, '.');
+   char *tok = (char*)strrchr(path_basename(tmp_path), '.');
    if (tok)
       *tok = '\0';
 
@@ -556,6 +690,61 @@ void path_resolve_realpath(char *buf, size_t size)
 #endif
 }
 
+static bool path_mkdir_norecurse(const char *dir)
+{
+#if defined(_WIN32)
+   int ret = _mkdir(dir);
+#elif defined(IOS)
+   int ret = mkdir(dir, 0755);
+#else
+   int ret = mkdir(dir, 0750);
+#endif
+   if (ret < 0 && errno == EEXIST && path_is_directory(dir)) // Don't treat this as an error.
+      ret = 0;
+   if (ret < 0)
+      RARCH_ERR("mkdir(%s) error: %s.\n", dir, strerror(errno));
+   return ret == 0;
+}
+
+bool path_mkdir(const char *dir)
+{
+   const char *target = NULL;
+   char *basedir = strdup(dir); // Use heap. Real chance of stack overflow if we recurse too hard.
+   bool ret = true;
+
+   if (!basedir)
+      return false;
+
+   path_parent_dir(basedir);
+   if (!*basedir || !strcmp(basedir, dir))
+   {
+      ret = false;
+      goto end;
+   }
+
+   if (path_is_directory(basedir))
+   {
+      target = dir;
+      ret = path_mkdir_norecurse(dir);
+   }
+   else
+   {
+      target = basedir;
+      ret = path_mkdir(basedir);
+      if (ret)
+      {
+         target = dir;
+         ret = path_mkdir_norecurse(dir);
+      }
+   }
+
+end:
+   if (target && !ret)
+      RARCH_ERR("Failed to create directory: \"%s\".\n", target);
+   free(basedir);
+   return ret;
+}
+
 void fill_pathname_resolve_relative(char *out_path, const char *in_refpath, const char *in_path, size_t size)
 {
    if (path_is_absolute(in_path))
@@ -578,22 +767,118 @@ void fill_pathname_join(char *out_path, const char *dir, const char *path, size_
    rarch_assert(strlcat(out_path, path, size) < size);
 }
 
+void fill_pathname_expand_special(char *out_path, const char *in_path, size_t size)
+{
+#if !defined(RARCH_CONSOLE)
+   if (*in_path == '~')
+   {
+      const char *home = getenv("HOME");
+      if (home)
+      {
+         size_t src_size = strlcpy(out_path, home, size);
+         rarch_assert(src_size < size);
+
+         out_path  += src_size;
+         size -= src_size;
+         in_path++;
+      }
+   }
+   else if ((in_path[0] == ':') &&
+#ifdef _WIN32
+         ((in_path[1] == '/') || (in_path[1] == '\\')))
+#else
+         (in_path[1] == '/'))
+#endif
+   {
+      char application_dir[PATH_MAX];
+      fill_pathname_application_path(application_dir, sizeof(application_dir));
+      path_basedir(application_dir);
+
+      size_t src_size = strlcpy(out_path, application_dir, size);
+      rarch_assert(src_size < size);
+
+      out_path  += src_size;
+      size -= src_size;
+      in_path += 2;
+   }
+#endif
+
+   rarch_assert(strlcpy(out_path, in_path, size) < size);
+}
+
+void fill_pathname_abbreviate_special(char *out_path, const char *in_path, size_t size)
+{
+#if !defined(RARCH_CONSOLE)
+   unsigned i;
+
+   const char *home = getenv("HOME");
+   char application_dir[PATH_MAX];
+   fill_pathname_application_path(application_dir, sizeof(application_dir));
+   path_basedir(application_dir);
+
+   // application_dir could be zero-string. Safeguard against this.
+
+   // Keep application dir in front of home, moving app dir to a new location inside
+   // home would break otherwise.
+   const char *candidates[3] = { application_dir, home, NULL };
+   const char *notations[3] = { ":", "~", NULL };
+   
+   for (i = 0; candidates[i]; i++)
+   {
+      if (*candidates[i] && strstr(in_path, candidates[i]) == in_path)
+      {
+         size_t src_size = strlcpy(out_path, notations[i], size);
+         rarch_assert(src_size < size);
+      
+         out_path += src_size;
+         size -= src_size;
+         in_path += strlen(candidates[i]);
+      
+         if (!path_char_is_slash(*in_path))
+         {
+            rarch_assert(strlcpy(out_path, path_default_slash(), size) < size);
+            out_path++;
+            size--;
+         }
+
+         break; // Don't allow more abbrevs to take place.
+      }
+   }
+#endif
+
+   rarch_assert(strlcpy(out_path, in_path, size) < size);
+}
+
 #ifndef RARCH_CONSOLE
 void fill_pathname_application_path(char *buf, size_t size)
 {
+   size_t i;
+   (void)i;
    if (!size)
       return;
 
 #ifdef _WIN32
    DWORD ret = GetModuleFileName(GetModuleHandle(NULL), buf, size - 1);
    buf[ret] = '\0';
+#elif defined(__APPLE__)
+   CFBundleRef bundle = CFBundleGetMainBundle();
+   if (bundle)
+   {
+      CFURLRef bundle_url = CFBundleCopyBundleURL(bundle);
+      CFStringRef bundle_path = CFURLCopyPath(bundle_url);
+      CFStringGetCString(bundle_path, buf, size, kCFStringEncodingUTF8);
+      CFRelease(bundle_path);
+      CFRelease(bundle_url);
+      
+      rarch_assert(strlcat(buf, "nobin", size) < size);
+      return;
+   }
 #else
-
    *buf = '\0';
    pid_t pid = getpid(); 
    char link_path[PATH_MAX];
    static const char *exts[] = { "exe", "file", "path/a.out" }; // Linux, BSD and Solaris paths. Not standardized.
-   for (unsigned i = 0; i < ARRAY_SIZE(exts); i++)
+   for (i = 0; i < ARRAY_SIZE(exts); i++)
    {
       snprintf(link_path, sizeof(link_path), "/proc/%u/%s", (unsigned)pid, exts[i]);
       ssize_t ret = readlink(link_path, buf, size - 1);

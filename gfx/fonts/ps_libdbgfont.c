@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -32,7 +32,8 @@
 #define DbgFontExit cellDbgFontExit
 #endif
 
-static bool gl_init_font(void *data, const char *font_path, float font_size)
+static bool gl_init_font(void *data, const char *font_path, float font_size,
+      unsigned win_width, unsigned win_height)
 {
    (void)font_path;
    (void)font_size;
@@ -45,15 +46,13 @@ static bool gl_init_font(void *data, const char *font_path, float font_size)
 #if defined(SN_TARGET_PSP2)
    cfg.fontSize     = SCE_DBGFONT_FONTSIZE_LARGE;
 #elif defined(__CELLOS_LV2__)
-   // FIXME - We need to do init_font_first in gl_start because of this
-   gl_t *gl = (gl_t*)driver.video_data;
-
    cfg.bufSize      = SCE_DBGFONT_BUFSIZE_LARGE;
-   cfg.screenWidth  = gl->win_width;
-   cfg.screenHeight = gl->win_height;
+   cfg.screenWidth  = win_width;
+   cfg.screenHeight = win_height;
 #endif
 
    DbgFontInit(&cfg);
+   free(handle);
 
    return true;
 }
@@ -82,7 +81,7 @@ static void gl_render_msg(void *data, const char *msg, void *parms)
    else
    {
       x = g_settings.video.msg_pos_x;
-      y = 0.76f;
+      y = 0.90f;
       scale = 1.04f;
       color = SILVER;
    }

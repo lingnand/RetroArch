@@ -1,6 +1,6 @@
 /* RetroArch - A frontend for libretro.
- * Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- * Copyright (C) 2011-2013 - Daniel De Matteis
+ * Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ * Copyright (C) 2011-2014 - Daniel De Matteis
  *
  * RetroArch is free software: you can redistribute it and/or modify it under the terms
  * of the GNU General Public License as published by the Free Software Found-
@@ -20,22 +20,25 @@
 #include "../../boolean.h"
 #include <stddef.h>
 #include <string.h>
+#include "../../dynamic.h"
+#include "../../libretro_private.h"
 
-static void get_environment_settings(int argc, char *argv[])
+static void get_environment_settings(int argc, char *argv[], void *args)
 {
    (void)argc;
    (void)argv;
 
 /* FIXME - should this apply for both BB10 and PB? */
 #if defined(__QNX__) && !defined(HAVE_BB10)
-   strlcpy(g_settings.libretro, "app/native/lib", sizeof(g_settings.libretro));
-   strlcpy(g_extern.config_path, "app/native/retroarch.cfg", sizeof(g_extern.config_path));
-   strlcpy(g_settings.video.shader_dir, "app/native/shaders_glsl", sizeof(g_settings.video.shader_dir));
+   rarch_environment_cb(RETRO_ENVIRONMENT_SET_LIBRETRO_PATH, (void*)"app/native/lib");
 #endif
+
+   config_load();
 }
 
-static void system_init(void)
+static void system_init(void *data)
 {
+   (void)data;
 /* FIXME - should this apply for both BB10 and PB? */
 #if defined(__QNX__) && !defined(HAVE_BB10)
    bps_initialize();

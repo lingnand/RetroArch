@@ -1,6 +1,7 @@
 /* RetroArch - A frontend for libretro.
- * Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- * Copyright (C) 2011-2013 - Daniel De Matteis
+ * Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ * Copyright (C) 2011-2014 - Daniel De Matteis
+ * Copyright (C) 2012-2014 - Jason Fetters
  *
  * RetroArch is free software: you can redistribute it and/or modify it under the terms
  * of the GNU General Public License as published by the Free Software Found-
@@ -13,9 +14,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <dispatch/dispatch.h>
-#include <pthread.h>
-#include "../../apple/RetroArch/rarch_wrapper.h"
+#include "../menu/menu_common.h"
+#include "../../apple/common/rarch_wrapper.h"
+#include "../../apple/common/apple_export.h"
+#include "../../apple/common/setting_data.h"
 
 #include "../frontend_context.h"
 
@@ -24,86 +26,68 @@
 #include <stddef.h>
 #include <string.h>
 
-static pthread_mutex_t apple_event_queue_lock = PTHREAD_MUTEX_INITIALIZER;
+extern bool apple_is_running;
 
-static struct
+void apple_event_basic_command(enum basic_event_t action)
 {
-   void (*function)(void*);
-   void* userdata;
-} apple_event_queue[16];
-
-static uint32_t apple_event_queue_size;
-
-void apple_frontend_post_event(void (*fn)(void*), void* userdata)
-{
-   pthread_mutex_lock(&apple_event_queue_lock);
-
-   if (apple_event_queue_size < 16)
+   switch (action)
    {
-      apple_event_queue[apple_event_queue_size].function = fn;
-      apple_event_queue[apple_event_queue_size].userdata = userdata;
-      apple_event_queue_size ++;
+      case RESET:
+         rarch_game_reset();
+         return;
+      case LOAD_STATE:
+         rarch_load_state();
+         return;
+      case SAVE_STATE:
+         rarch_save_state();
+         return;
+      case QUIT:
+         g_extern.system.shutdown = true;
+         return;
    }
-
-   pthread_mutex_unlock(&apple_event_queue_lock);
 }
 
-static void apple_free_main_wrap(struct rarch_main_wrap* wrap)
+void apple_refresh_config(void)
 {
-   if (wrap)
+   // Little nudge to prevent stale values when reloading the confg file
+   g_extern.block_config_read = false;
+   memset(g_settings.input.overlay, 0, sizeof(g_settings.input.overlay));
+   memset(g_settings.video.shader_path, 0, sizeof(g_settings.video.shader_path));
+
+   if (apple_is_running)
    {
-      free((char*)wrap->libretro_path);
-      free((char*)wrap->rom_path);
-      free((char*)wrap->sram_path);
-      free((char*)wrap->state_path);
-      free((char*)wrap->config_path);
+      uninit_drivers();
+      config_load();
+      init_drivers();
    }
-
-   free(wrap);
 }
 
-static void process_events(void)
+int apple_rarch_load_content(int argc, char* argv[])
 {
-   pthread_mutex_lock(&apple_event_queue_lock);
-
-   for (int i = 0; i < apple_event_queue_size; i ++)
-      apple_event_queue[i].function(apple_event_queue[i].userdata);
-
-   apple_event_queue_size = 0;
-
-   pthread_mutex_unlock(&apple_event_queue_lock);
-}
-
-static void system_shutdown(bool force)
-{
-   /* force set to true makes it display the 'Failed to load game' message. */
-   if (force)
-      dispatch_async_f(dispatch_get_main_queue(), (void*)1, apple_rarch_exited);
-   else
-      dispatch_async_f(dispatch_get_main_queue(), 0, apple_rarch_exited);
-}
-
-static void environment_get(int argc, char *argv[])
-{
-   (void)argc;
-   (void)argv;
-
-#ifdef IOS
-   char* system_directory = ios_get_rarch_system_directory();
-   strlcpy(g_extern.savestate_dir, system_directory, sizeof(g_extern.savestate_dir));
-   strlcpy(g_extern.savefile_dir, system_directory, sizeof(g_extern.savefile_dir));
-   free(system_directory);
-#endif
+   rarch_main_clear_state();
+   rarch_init_msg_queue();
+   
+   if (rarch_main_init(argc, argv))
+      return 1;
+   
+   menu_init();
+   
+   if (!g_extern.libretro_dummy)
+      menu_rom_history_push_current();   
+   
+   g_extern.lifecycle_state |= 1ULL << MODE_GAME;
+   
+   return 0;
 }
 
 const frontend_ctx_driver_t frontend_ctx_apple = {
-   environment_get,              /* environment_get */
+   NULL,                         /* environment_get */
    NULL,                         /* init */
    NULL,                         /* deinit */
    NULL,                         /* exitspawn */
    NULL,                         /* process_args */
-   process_events,               /* process_events */
+   NULL,                         /* process_events */
    NULL,                         /* exec */
-   system_shutdown,              /* shutdown */
+   NULL,                         /* shutdown */
    "apple",
 };

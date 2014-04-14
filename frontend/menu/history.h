@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -26,6 +26,8 @@ typedef struct rom_history rom_history_t;
 
 rom_history_t *rom_history_init(const char *path, size_t size);
 void rom_history_free(rom_history_t *hist);
+
+void rom_history_clear(rom_history_t *hist);
 
 size_t rom_history_size(rom_history_t *hist);
 

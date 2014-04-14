@@ -26,14 +26,11 @@
 							<tool id="com.qnx.qcc.tool.compiler.1147733376" name="QCC Compiler" superClass="com.qnx.qcc.tool.compiler">
 								<option id="com.qnx.qcc.option.compiler.optlevel.892006936" name="Optimization Level" superClass="com.qnx.qcc.option.compiler.optlevel" value="com.qnx.qcc.option.compiler.optlevel.0" valueType="enumerated"/>
 								<option id="com.qnx.qcc.option.compiler.includePath.648804544" name="Include Directories (-I)" superClass="com.qnx.qcc.option.compiler.includePath" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;C:\bbstuff\RetroArch-master&quot;"/>
+									<listOptionValue builtIn="false" value=""/>
 								</option>
 								<inputType id="com.qnx.qcc.inputType.compiler.1380205468" superClass="com.qnx.qcc.inputType.compiler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.877192143" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
-								<option id="com.qnx.qcc.option.assembler.includePath.466584946" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;C:\bbstuff\RetroArch-master&quot;"/>
-								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.1283361903" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.787059897" name="QCC Linker" superClass="com.qnx.qcc.tool.linker"/>
@@ -71,14 +68,10 @@
 								<option id="com.qnx.qcc.option.compiler.optlevel.2044863902" name="Optimization Level" superClass="com.qnx.qcc.option.compiler.optlevel" value="com.qnx.qcc.option.compiler.optlevel.0" valueType="enumerated"/>
 								<option id="com.qnx.qcc.option.compiler.includePath.338882043" name="Include Directories (-I)" superClass="com.qnx.qcc.option.compiler.includePath" valueType="includePath">
 									<listOptionValue builtIn="false" value=""/>
-									<listOptionValue builtIn="false" value="&quot;C:\bbstuff\RetroArch-master&quot;"/>
 								</option>
 								<inputType id="com.qnx.qcc.inputType.compiler.654111043" superClass="com.qnx.qcc.inputType.compiler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.1149485049" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
-								<option id="com.qnx.qcc.option.assembler.includePath.1151883327" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;C:\bbstuff\RetroArch-master&quot;"/>
-								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.1795878575" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.642751169" name="QCC Linker" superClass="com.qnx.qcc.tool.linker"/>
@@ -116,14 +109,10 @@
 								<option id="com.qnx.qcc.option.compiler.optlevel.657360321" name="Optimization Level" superClass="com.qnx.qcc.option.compiler.optlevel" value="com.qnx.qcc.option.compiler.optlevel.0" valueType="enumerated"/>
 								<option id="com.qnx.qcc.option.compiler.includePath.562881203" name="Include Directories (-I)" superClass="com.qnx.qcc.option.compiler.includePath" valueType="includePath">
 									<listOptionValue builtIn="false" value=""/>
-									<listOptionValue builtIn="false" value="&quot;C:\bbstuff\RetroArch-master&quot;"/>
 								</option>
 								<inputType id="com.qnx.qcc.inputType.compiler.1900117338" superClass="com.qnx.qcc.inputType.compiler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.1050656095" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
-								<option id="com.qnx.qcc.option.assembler.includePath.333695524" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
-									<listOptionValue builtIn="false" value="&quot;C:\bbstuff\RetroArch-master&quot;"/>
-								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.1704624842" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.72689410" name="QCC Linker" superClass="com.qnx.qcc.tool.linker"/>
@@ -141,32 +130,23 @@
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="helloforeignwindow.null.1735512392" name="helloforeignwindow"/>
 	</storageModule>
-	<storageModule moduleId="refreshScope" versionNumber="2">
-		<configuration configurationName="Device-Profile">
-			<resource resourceType="PROJECT" workspacePath="/RetroArch-Cascades"/>
-		</configuration>
-		<configuration configurationName="Device-Debug">
-			<resource resourceType="PROJECT" workspacePath="/RetroArch-Cascades"/>
-		</configuration>
-		<configuration configurationName="Device-Release">
-			<resource resourceType="PROJECT" workspacePath="/RetroArch-Cascades"/>
-		</configuration>
-	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.qnx.tools.ide.qde.managedbuilder.core.qccScannerInfo"/>
-		<scannerConfigBuildInfo instanceId="com.qnx.qcc.toolChain.802312629">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.qnx.tools.ide.qde.managedbuilder.core.qccScannerInfo"/>
-		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.qnx.qcc.toolChain.909118143">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.qnx.tools.ide.qde.managedbuilder.core.qccScannerInfo"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.qnx.qcc.toolChain.414809724">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.qnx.tools.ide.qde.managedbuilder.core.qccScannerInfo"/>
 		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="com.qnx.qcc.toolChain.802312629">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.qnx.tools.ide.qde.managedbuilder.core.qccScannerInfo"/>
+		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.qnx.qcc.toolChain.1305277251">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.qnx.tools.ide.qde.managedbuilder.core.qccScannerInfo"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+	<storageModule moduleId="refreshScope" versionNumber="1">
+		<resource resourceType="PROJECT" workspacePath="/RetroArch-Cascades"/>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 </cproject>

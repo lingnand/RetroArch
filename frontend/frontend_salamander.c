@@ -1,6 +1,6 @@
 /* RetroArch - A frontend for libretro.
- * Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- * Copyright (C) 2011-2013 - Daniel De Matteis
+ * Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ * Copyright (C) 2011-2014 - Daniel De Matteis
  *
  * RetroArch is free software: you can redistribute it and/or modify it under the terms
  * of the GNU General Public License as published by the Free Software Found-
@@ -21,16 +21,16 @@
 
 #include "../file_ext.h"
 #include "frontend_salamander.h"
-
-#if defined(RARCH_CONSOLE)
 #include "frontend_context.h"
-frontend_ctx_driver_t *frontend_ctx;
-#endif
+
 
 #if defined(__CELLOS_LV2__)
 #include "platform/platform_ps3.c"
 #elif defined(GEKKO)
 #include "platform/platform_gx.c"
+#ifdef HW_RVL
+#include "platform/platform_wii.c"
+#endif
 #elif defined(_XBOX)
 #include "platform/platform_xdk.c"
 #elif defined(PSP)
@@ -86,26 +86,28 @@ static void find_first_libretro_core(char *first_file,
    dir_list_free(list);
 }
 
-static int system_ctx_init(void)
-{
-#ifdef RARCH_CONSOLE
-   if ((frontend_ctx = (frontend_ctx_driver_t*)frontend_ctx_init_first()) == NULL)
-      return -1;
-#endif
-
-   return 0;
-}
-
 int main(int argc, char *argv[])
 {
-   if (system_ctx_init() != 0)
+   void *args = NULL;
+   frontend_ctx_driver_t *frontend_ctx = (frontend_ctx_driver_t*)frontend_ctx_init_first();
+
+   if (!frontend_ctx)
       return 0;
 
-   frontend_ctx->init();
-   get_environment_settings(argc, argv);
-   salamander_init_settings();
-   frontend_ctx->deinit();
-   frontend_ctx->exitspawn();
+   if (frontend_ctx && frontend_ctx->init)
+      frontend_ctx->init(args);
+
+   if (frontend_ctx && frontend_ctx->environment_get)
+      frontend_ctx->environment_get(argc, argv, args);
+
+   if (frontend_ctx && frontend_ctx->salamander_init)
+      frontend_ctx->salamander_init();
+
+   if (frontend_ctx && frontend_ctx->deinit)
+      frontend_ctx->deinit(args);
+
+   if (frontend_ctx && frontend_ctx->exitspawn)
+      frontend_ctx->exitspawn();
 
    return 1;
 }

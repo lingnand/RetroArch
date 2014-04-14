@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -41,6 +41,8 @@ typedef struct config_file config_file_t;
 // Loads a config file. Returns NULL if file doesn't exist.
 // NULL path will create an empty config file.
 config_file_t *config_file_new(const char *path);
+// Load a config file from a string.
+config_file_t *config_file_new_from_string(const char *from_string);
 // Frees config file.
 void config_file_free(config_file_t *conf);
 
@@ -96,6 +98,7 @@ void config_set_hex(config_file_t *conf, const char *entry, unsigned val);
 void config_set_uint64(config_file_t *conf, const char *entry, uint64_t val);
 void config_set_char(config_file_t *conf, const char *entry, char val);
 void config_set_string(config_file_t *conf, const char *entry, const char *val);
+void config_set_path(config_file_t *conf, const char *entry, const char *val);
 void config_set_bool(config_file_t *conf, const char *entry, bool val);
 
 // Write the current config to a file.

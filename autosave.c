@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -122,6 +122,9 @@ void autosave_unlock(autosave_t *handle)
 
 void autosave_free(autosave_t *handle)
 {
+   if (!handle)
+      return;
+
    slock_lock(handle->cond_lock);
    handle->quit = true;
    slock_unlock(handle->cond_lock);
@@ -138,7 +141,8 @@ void autosave_free(autosave_t *handle)
 
 void lock_autosave(void)
 {
-   for (unsigned i = 0; i < sizeof(g_extern.autosave)/sizeof(g_extern.autosave[0]); i++)
+   unsigned i;
+   for (i = 0; i < g_extern.num_autosave; i++)
    {
       if (g_extern.autosave[i])
          autosave_lock(g_extern.autosave[i]);
@@ -147,7 +151,8 @@ void lock_autosave(void)
 
 void unlock_autosave(void)
 {
-   for (unsigned i = 0; i < sizeof(g_extern.autosave)/sizeof(g_extern.autosave[0]); i++)
+   unsigned i;
+   for (i = 0; i < g_extern.num_autosave; i++)
    {
       if (g_extern.autosave[i])
          autosave_unlock(g_extern.autosave[i]);

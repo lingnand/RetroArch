@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -49,7 +49,9 @@ unsigned x11_get_xinerama_monitor(Display *dpy,
       int x, int y, int w, int h);
 #endif
 
-void x11_handle_key_event(XEvent *event);
+bool x11_create_input_context(Display *dpy, Window win, XIM *xim, XIC *xic);
+void x11_destroy_input_context(XIM *xim, XIC *xic);
+void x11_handle_key_event(XEvent *event, XIC ic, bool filter);
 
 #endif
 

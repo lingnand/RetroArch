@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -18,23 +18,6 @@
 #define _JNI_MACROS_H
 
 #include <jni.h>
-
-struct jni_params
-{
-   JavaVM *java_vm;
-   JNIEnv *env;
-   jobject class_obj;
-   char class_name[128];
-   char method_name[128];
-   char method_signature[128];
-};
-
-struct jni_out_params_char
-{
-   char *out;
-   size_t out_sizeof;
-   char in[128];
-};
 
 #define JNI_EXCEPTION(env) \
    if ((*env)->ExceptionOccurred(env)) \
@@ -77,6 +60,22 @@ struct jni_out_params_char
 
 #define CALL_OBJ_METHOD_PARAM(env, var, clazz_obj, methodId, ...) \
    var = (*env)->CallObjectMethod(env, clazz_obj, methodId, __VA_ARGS__); \
+   JNI_EXCEPTION(env)
+
+#define CALL_VOID_METHOD(env, clazz_obj, methodId) \
+   (*env)->CallVoidMethod(env, clazz_obj, methodId); \
+   JNI_EXCEPTION(env)
+
+#define CALL_VOID_METHOD_PARAM(env, clazz_obj, methodId, ...) \
+   (*env)->CallVoidMethod(env, clazz_obj, methodId, __VA_ARGS__); \
+   JNI_EXCEPTION(env)
+
+#define CALL_BOOLEAN_METHOD(env, var, clazz_obj, methodId) \
+   var = (*env)->CallBooleanMethod(env, clazz_obj, methodId); \
+   JNI_EXCEPTION(env)
+
+#define CALL_DOUBLE_METHOD(env, var, clazz_obj, methodId) \
+   var = (*env)->CallDoubleMethod(env, clazz_obj, methodId); \
    JNI_EXCEPTION(env)
 
 #endif

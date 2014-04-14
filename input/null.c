@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -61,6 +61,20 @@ static void nullinput_set_keybinds(void *data, unsigned device,
    (void)keybind_action;
 }
 
+static uint64_t nullinput_get_capabilities(void *data)
+{
+   uint64_t caps = 0;
+
+   caps |= (1 << RETRO_DEVICE_JOYPAD);
+
+   return caps;
+}
+
+static bool nullinput_set_sensor_state(void *data, unsigned port, enum retro_sensor_action action, unsigned event_rate)
+{
+   return false;
+}
+
 const input_driver_t input_null = {
    nullinput_input_init,
    nullinput_input_poll,
@@ -68,6 +82,8 @@ const input_driver_t input_null = {
    nullinput_input_key_pressed,
    nullinput_input_free_input,
    nullinput_set_keybinds,
+   nullinput_set_sensor_state,
+   NULL,
+   nullinput_get_capabilities,
    "null",
 };
-

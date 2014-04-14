@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -18,18 +18,20 @@
 #include "../../general.h"
 
 static const gl_font_renderer_t *gl_font_backends[] = {
-#ifdef HAVE_LIBDBGFONT
+#if defined(HAVE_LIBDBGFONT)
    &libdbg_font,
 #else
    &gl_raster_font,
 #endif
 };
 
-const gl_font_renderer_t *gl_font_init_first(void *data, const char *font_path, float font_size)
+const gl_font_renderer_t *gl_font_init_first(void *data, const char *font_path, float font_size,
+      unsigned win_width, unsigned win_height)
 {
-   for (unsigned i = 0; i < ARRAY_SIZE(gl_font_backends); i++)
+   size_t i;
+   for (i = 0; i < ARRAY_SIZE(gl_font_backends); i++)
    {
-      if (gl_font_backends[i]->init(data, font_path, font_size))
+      if (gl_font_backends[i]->init(data, font_path, font_size, win_width, win_height))
          return gl_font_backends[i];
    }
 

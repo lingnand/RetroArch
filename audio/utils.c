@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2014 - Ali Bouhlel ( aliaspider@gmail.com )
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -28,15 +29,17 @@
 void audio_convert_s16_to_float_C(float *out,
       const int16_t *in, size_t samples, float gain)
 {
+   size_t i;
    gain = gain / 0x8000;
-   for (size_t i = 0; i < samples; i++)
+   for (i = 0; i < samples; i++)
       out[i] = (float)in[i] * gain; 
 }
 
 void audio_convert_float_to_s16_C(int16_t *out,
       const float *in, size_t samples)
 {
-   for (size_t i = 0; i < samples; i++)
+   size_t i;
+   for (i = 0; i < samples; i++)
    {
       int32_t val = (int32_t)(in[i] * 0x8000);
       out[i] = (val > 0x7FFF) ? 0x7FFF : (val < -0x8000 ? -0x8000 : (int16_t)val);
@@ -92,8 +95,8 @@ void audio_convert_float_to_s16_SSE2(int16_t *out,
 void audio_convert_s16_to_float_altivec(float *out,
       const int16_t *in, size_t samples, float gain)
 {
-   const vector float gain_vec = vec_splats(gain);
-   const vector float zero_vec = vec_splats(0.0f);
+   const vector float gain_vec = vec_splat((vector float)gain, 0);
+   const vector float zero_vec = vec_splat((vector float)0.0f, 0);
    // Unaligned loads/store is a bit expensive, so we optimize for the good path (very likely).
    if (((uintptr_t)out & 15) + ((uintptr_t)in & 15) == 0)
    {
@@ -138,19 +141,17 @@ void audio_convert_float_to_s16_altivec(int16_t *out,
       audio_convert_float_to_s16_C(out, in, samples);
 }
 #elif defined(HAVE_NEON)
-void audio_convert_s16_float_asm(float *out, const int16_t *in, size_t samples);
+void audio_convert_s16_float_asm(float *out, const int16_t *in, size_t samples, const float *gain); // Avoid potential hard-float/soft-float ABI issues.
 static void audio_convert_s16_to_float_neon(float *out, const int16_t *in, size_t samples,
       float gain)
 {
-   (void)gain; // gain is ignored for now.
-
    size_t aligned_samples = samples & ~7;
    if (aligned_samples)
-      audio_convert_s16_float_asm(out, in, aligned_samples);
+      audio_convert_s16_float_asm(out, in, aligned_samples, &gain);
 
    // Could do all conversion in ASM, but keep it simple for now.
    audio_convert_s16_to_float_C(out + aligned_samples, in + aligned_samples,
-         samples - aligned_samples, 1.0f);
+         samples - aligned_samples, gain);
 }
 
 void audio_convert_float_s16_asm(int16_t *out, const float *in, size_t samples);
@@ -163,51 +164,112 @@ static void audio_convert_float_to_s16_neon(int16_t *out, const float *in, size_
    audio_convert_float_to_s16_C(out + aligned_samples, in + aligned_samples,
          samples - aligned_samples);
 }
+#elif defined(_MIPS_ARCH_ALLEGREX)
+void audio_convert_s16_to_float_ALLEGREX(float *out,
+      const int16_t *in, size_t samples, float gain)
+{
+#ifdef DEBUG
+   // Make sure the buffer is 16 byte aligned, this should be the default behaviour of malloc in the PSPSDK.
+   // Only the output buffer can be assumed to be 16-byte aligned.
+   rarch_assert(((uintptr_t)out & 0xf) == 0);
+#endif
+
+   size_t i;
+   gain = gain / 0x8000;
+   __asm__ (
+         ".set    push                    \n"
+         ".set    noreorder               \n"
+         "mtv     %0, s200                \n"
+         ".set    pop                     \n"
+         ::"r"(gain));
+
+   for (i = 0; i + 16 <= samples; i += 16)
+   {
+      __asm__ (
+            ".set    push                 \n"
+            ".set    noreorder            \n"
+
+            "lv.s    s100,  0(%0)         \n"
+            "lv.s    s101,  4(%0)         \n"
+            "lv.s    s110,  8(%0)         \n"
+            "lv.s    s111, 12(%0)         \n"
+            "lv.s    s120, 16(%0)         \n"
+            "lv.s    s121, 20(%0)         \n"
+            "lv.s    s130, 24(%0)         \n"
+            "lv.s    s131, 28(%0)         \n"
+
+            "vs2i.p  c100, c100           \n"
+            "vs2i.p  c110, c110           \n"
+            "vs2i.p  c120, c120           \n"
+            "vs2i.p  c130, c130           \n"
+
+            "vi2f.q  c100, c100, 16       \n"
+            "vi2f.q  c110, c110, 16       \n"
+            "vi2f.q  c120, c120, 16       \n"
+            "vi2f.q  c130, c130, 16       \n"
+
+            "vmscl.q e100, e100, s200     \n"
+
+            "sv.q    c100,  0(%1)         \n"
+            "sv.q    c110, 16(%1)         \n"
+            "sv.q    c120, 32(%1)         \n"
+            "sv.q    c130, 48(%1)         \n"
+
+            ".set    pop                  \n"
+            :: "r"(in + i), "r"(out + i));
+   }
+
+   for (; i < samples; i++)
+      out[i] = (float)in[i] * gain;
+}
+
+void audio_convert_float_to_s16_ALLEGREX(int16_t *out,
+      const float *in, size_t samples)
+{
+#ifdef DEBUG
+   // Make sure the buffers are 16 byte aligned, this should be the default behaviour of malloc in the PSPSDK.
+   // Both buffers are allocated by RetroArch, so can assume alignment.
+   rarch_assert(((uintptr_t)in  & 0xf) == 0);
+   rarch_assert(((uintptr_t)out & 0xf) == 0);
+#endif
+
+   size_t i;
+   for (i = 0; i + 8 <= samples; i += 8)
+   {
+      __asm__ (
+            ".set    push                 \n"
+            ".set    noreorder            \n"
+
+            "lv.q    c100,  0(%0)         \n"
+            "lv.q    c110,  16(%0)        \n"
+
+            "vf2in.q c100, c100, 31       \n"
+            "vf2in.q c110, c110, 31       \n"
+            "vi2s.q  c100, c100           \n"
+            "vi2s.q  c102, c110           \n"
+
+            "sv.q    c100,  0(%1)         \n"
+
+            ".set    pop                  \n"
+            :: "r"(in + i), "r"(out + i));
+   }
+
+   for (; i < samples; i++)
+   {
+      int32_t val = (int32_t)(in[i] * 0x8000);
+      out[i] = (val > 0x7FFF) ? 0x7FFF : (val < -0x8000 ? -0x8000 : (int16_t)val);
+   }
+}
 #endif
 
 void audio_convert_init_simd(void)
 {
 #ifdef HAVE_NEON
-   struct rarch_cpu_features cpu;
-   rarch_get_cpu_features(&cpu);
-   audio_convert_s16_to_float_arm = cpu.simd & RARCH_SIMD_NEON ?
+   unsigned cpu = rarch_get_cpu_features();
+   audio_convert_s16_to_float_arm = cpu & RETRO_SIMD_NEON ?
       audio_convert_s16_to_float_neon : audio_convert_s16_to_float_C;
-   audio_convert_float_to_s16_arm = cpu.simd & RARCH_SIMD_NEON ?
+   audio_convert_float_to_s16_arm = cpu & RETRO_SIMD_NEON ?
       audio_convert_float_to_s16_neon : audio_convert_float_to_s16_C;
 #endif
 }
 
-#ifdef HAVE_RSOUND
-
-bool rarch_rsound_start(const char *ip)
-{
-   strlcpy(g_settings.audio.driver, "rsound", sizeof(g_settings.audio.driver));
-   strlcpy(g_settings.audio.device, ip, sizeof(g_settings.audio.device));
-   driver.audio_data = NULL;
-
-   // If driver already has started, it must be reinited.
-   if (driver.audio_data)
-   {
-      uninit_audio();
-      driver.audio_data = NULL;
-      init_drivers_pre();
-      init_audio();
-   }
-   return g_extern.audio_active;
-}
-
-void rarch_rsound_stop(void)
-{
-   strlcpy(g_settings.audio.driver, config_get_default_audio(), sizeof(g_settings.audio.driver));
-
-   // If driver already has started, it must be reinited.
-   if (driver.audio_data)
-   {
-      uninit_audio();
-      driver.audio_data = NULL;
-      init_drivers_pre();
-      init_audio();
-   }
-}
-
-#endif

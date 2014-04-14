@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2013 - Jason Fetters
+ *  Copyright (C) 2013-2014 - Jason Fetters
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -16,67 +16,35 @@
 #ifndef _RARCH_APPLE_VIEWS_H
 #define _RARCH_APPLE_VIEWS_H
 
-#import "RAModuleInfo.h"
+#include <UIKit/UIKit.h>
+#include "frontend/info/core_info.h"
 
-// RALogView.m
-@interface RALogView : UITableViewController
+
+#include "menu.h"
+
+// browser.m
+@interface RADirectoryItem : NSObject<RAMenuItemBase>
+@property (nonatomic) NSString* path;
+@property (nonatomic) bool isDirectory;
 @end
 
-// utility.m
-@interface RATableViewController : UITableViewController
-@property NSMutableArray* sections;
-@property BOOL hidesHeaders;
+@interface RADirectoryList : RAMenuBase<UIActionSheetDelegate>
+@property (nonatomic, weak) RADirectoryItem* selectedItem;
 
-- (id)initWithStyle:(UITableViewStyle)style;
-- (id)itemForIndexPath:(NSIndexPath*)indexPath;
+@property (nonatomic, copy) void (^chooseAction)(RADirectoryList* list, RADirectoryItem* item);
+@property (nonatomic, copy) NSString* path;
+@property (nonatomic, copy) NSString* extensions;
+
+@property (nonatomic) bool allowBlank;
+@property (nonatomic) bool forDirectory;
+
+- (id)initWithPath:(NSString*)path extensions:(const char*)extensions action:(void (^)(RADirectoryList* list, RADirectoryItem* item))action;
+- (void)browseTo:(NSString*)path;
 @end
 
 // browser.m
-@interface RADirectoryItem : NSObject
-@property (strong) NSString* path;
-@property bool isDirectory;
-@end
-
-// browser.m
-@interface RADirectoryList : RATableViewController <UIActionSheetDelegate>
-@property (nonatomic, weak) RADirectoryItem *selectedItem;
-
-+ (id)directoryListAtBrowseRoot;
-+ (id)directoryListForPath:(NSString*)path;
-- (id)initWithPath:(NSString*)path;
-@end
-
-// browser.m
-@interface RAModuleList : RATableViewController
-- (id)initWithGame:(NSString*)path;
-@end
-
-// browser.m
-@interface RAFoldersList : UITableViewController
-- (id) initWithFilePath:(NSString *)path;
-@end
-
-// RAModuleInfo.m
-@interface RAModuleInfoList : RATableViewController
-- (id)initWithModuleInfo:(RAModuleInfo*)info;
-@end
-
-// settings.m
-@interface RASettingsSubList : RATableViewController
-- (id)initWithSettings:(NSArray*)values title:(NSString*)title;
-- (void)writeSettings:(NSArray*)settingList toConfig:(config_file_t*)config;
-
-- (bool)isSettingsView;
-@end
-
-// settings.m
-@interface RASettingsList : RASettingsSubList
-+ (void)refreshModuleConfig:(RAModuleInfo*)module;
-- (id)initWithModule:(RAModuleInfo*)module;
-@end
-
-// settings.m
-@interface RASystemSettingsList : RASettingsSubList<UIAlertViewDelegate>
+@interface RAFoldersList : RAMenuBase
+- (id) initWithFilePath:(NSString*)path;
 @end
 
 #endif

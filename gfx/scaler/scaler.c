@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "../../libretro.h"
 #include "../../performance.h"
 
 // In case aligned allocs are needed later ...
@@ -84,10 +85,10 @@ static bool set_direct_pix_conv(struct scaler_ctx *ctx)
       ctx->direct_pixconv = conv_argb8888_bgr24;
    else if (ctx->in_fmt == SCALER_FMT_0RGB1555 && ctx->out_fmt == SCALER_FMT_BGR24)
       ctx->direct_pixconv = conv_0rgb1555_bgr24;
-   else if (ctx->in_fmt == SCALER_FMT_RGB565 && ctx->out_fmt == SCALER_FMT_BGR24)
-      ctx->direct_pixconv = conv_rgb565_bgr24;
    else if (ctx->in_fmt == SCALER_FMT_ARGB8888 && ctx->out_fmt == SCALER_FMT_ABGR8888)
       ctx->direct_pixconv = conv_argb8888_abgr8888;
+   else if (ctx->in_fmt == SCALER_FMT_YUYV && ctx->out_fmt == SCALER_FMT_ARGB8888)
+      ctx->direct_pixconv = conv_yuyv_argb8888;
    else
       return false;
 

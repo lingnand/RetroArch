@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -22,12 +22,15 @@ static const d3d_font_renderer_t *d3d_font_backends[] = {
    &d3d_xdk1_font,
 #elif defined(_XBOX360)
    &d3d_xbox360_font,
+#elif defined(_WIN32)
+   &d3d_win32_font,
 #endif
 };
 
 const d3d_font_renderer_t *d3d_font_init_first(void *data, const char *font_path, unsigned font_size)
 {
-   for (unsigned i = 0; i < ARRAY_SIZE(d3d_font_backends); i++)
+   unsigned i;
+   for (i = 0; i < ARRAY_SIZE(d3d_font_backends); i++)
    {
       if (d3d_font_backends[i]->init(data, font_path, font_size))
          return d3d_font_backends[i];

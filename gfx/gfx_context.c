@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -13,7 +13,9 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "../general.h"
 #include "gfx_context.h"
+#include "../general.h"
 #include <string.h>
 
 #ifdef HAVE_CONFIG_H
@@ -24,8 +26,8 @@ static const gfx_ctx_driver_t *gfx_ctx_drivers[] = {
 #if defined(__CELLOS_LV2__)
    &gfx_ctx_ps3,
 #endif
-#if defined(_XBOX)
-   &gfx_ctx_xdk,
+#if defined(HAVE_WIN32_D3D9) || defined(_XBOX)
+   &gfx_ctx_d3d9,
 #endif
 #if defined(HAVE_VIDEOCORE)
    &gfx_ctx_videocore,
@@ -51,11 +53,16 @@ static const gfx_ctx_driver_t *gfx_ctx_drivers[] = {
 #if defined(IOS) || defined(OSX) //< Don't use __APPLE__ as it breaks basic SDL builds
    &gfx_ctx_apple,
 #endif
+#ifdef EMSCRIPTEN
+   &gfx_ctx_emscripten,
+#endif
+   NULL
 };
 
 const gfx_ctx_driver_t *gfx_ctx_find_driver(const char *ident)
 {
-   for (unsigned i = 0; i < sizeof(gfx_ctx_drivers) / sizeof(gfx_ctx_drivers[0]); i++)
+   unsigned i;
+   for (i = 0; i < ARRAY_SIZE(gfx_ctx_drivers); i++)
    {
       if (strcmp(gfx_ctx_drivers[i]->ident, ident) == 0)
          return gfx_ctx_drivers[i];
@@ -64,13 +71,14 @@ const gfx_ctx_driver_t *gfx_ctx_find_driver(const char *ident)
    return NULL;
 }
 
-const gfx_ctx_driver_t *gfx_ctx_init_first(enum gfx_ctx_api api)
+const gfx_ctx_driver_t *gfx_ctx_init_first(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
-   for (unsigned i = 0; i < sizeof(gfx_ctx_drivers) / sizeof(gfx_ctx_drivers[0]); i++)
+   unsigned i;
+   for (i = 0; gfx_ctx_drivers[i]; i++)
    {
-      if (gfx_ctx_drivers[i]->bind_api(api))
+      if (gfx_ctx_drivers[i]->bind_api(data, api, major, minor))
       {
-         if (gfx_ctx_drivers[i]->init())
+         if (gfx_ctx_drivers[i]->init(data))
             return gfx_ctx_drivers[i];
       }
    }

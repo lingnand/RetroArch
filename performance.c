@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -14,15 +14,22 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+#include "libretro.h"
 #include "performance.h"
 #include "general.h"
 
 #ifdef ANDROID
-#include "android/native/jni/cpufeatures.h"
+#include "performance/performance_android.h"
 #endif
 
 #if !defined(_WIN32) && !defined(RARCH_CONSOLE)
 #include <unistd.h>
+#endif
+
+#if defined(_WIN32) && !defined(_XBOX)
+#include <windows.h>
+#include <intrin.h>
 #endif
 
 #if defined(__CELLOS_LV2__) || defined(GEKKO)
@@ -36,10 +43,12 @@
 #include <time.h>
 #endif
 
-#ifdef __QNX__
-#ifndef CLOCK_MONOTONIC
+#if defined(__QNX__) && !defined(CLOCK_MONOTONIC)
 #define CLOCK_MONOTONIC 2
 #endif
+
+#if defined(__mips__)
+#include <sys/time.h>
 #endif
 
 #if defined(__PSL1GHT__)
@@ -58,30 +67,77 @@
 #include <mach/mach.h>
 #endif
 
-#ifdef PERF_TEST
-#define MAX_COUNTERS 64
-static struct rarch_perf_counter *perf_counters[MAX_COUNTERS];
-static unsigned perf_ptr;
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
 
-void rarch_perf_register(struct rarch_perf_counter *perf)
+#include <string.h>
+
+#define MAX_COUNTERS 64
+static const struct retro_perf_counter *perf_counters_rarch[MAX_COUNTERS];
+static const struct retro_perf_counter *perf_counters_libretro[MAX_COUNTERS];
+static unsigned perf_ptr_rarch;
+static unsigned perf_ptr_libretro;
+
+void rarch_perf_register(struct retro_perf_counter *perf)
 {
-   if (perf_ptr >= MAX_COUNTERS)
+   if (perf->registered || perf_ptr_rarch >= MAX_COUNTERS)
       return;
 
-   perf_counters[perf_ptr++] = perf;
+   perf_counters_rarch[perf_ptr_rarch++] = perf;
    perf->registered = true;
+}
+
+void retro_perf_register(struct retro_perf_counter *perf)
+{
+   if (perf->registered || perf_ptr_libretro >= MAX_COUNTERS)
+      return;
+
+   perf_counters_libretro[perf_ptr_libretro++] = perf;
+   perf->registered = true;
+}
+
+void retro_perf_clear(void)
+{
+   perf_ptr_libretro = 0;
+   memset(perf_counters_libretro, 0, sizeof(perf_counters_libretro));
+}
+
+#ifdef _WIN32
+#define PERF_LOG_FMT "[PERF]: Avg (%s): %I64u ticks, %I64u runs.\n"
+#else
+#define PERF_LOG_FMT "[PERF]: Avg (%s): %llu ticks, %llu runs.\n"
+#endif
+
+static void log_counters(const struct retro_perf_counter **counters, unsigned num)
+{
+   unsigned i;
+   for (i = 0; i < num; i++)
+   {
+      RARCH_LOG(PERF_LOG_FMT,
+            counters[i]->ident,
+            (unsigned long long)counters[i]->total / (unsigned long long)counters[i]->call_cnt,
+            (unsigned long long)counters[i]->call_cnt);
+   }
 }
 
 void rarch_perf_log(void)
 {
-   RARCH_LOG("[PERF]: Performance counters:\n");
-   for (unsigned i = 0; i < perf_ptr; i++)
-      RARCH_PERFORMANCE_LOG(perf_counters[i]->ident, *perf_counters[i]);
+#if defined(PERF_TEST) || !defined(RARCH_INTERNAL)
+   RARCH_LOG("[PERF]: Performance counters (RetroArch):\n");
+   log_counters(perf_counters_rarch, perf_ptr_rarch);
+#endif
 }
 
-rarch_perf_tick_t rarch_get_perf_counter(void)
+void retro_perf_log(void)
 {
-   rarch_perf_tick_t time = 0;
+   RARCH_LOG("[PERF]: Performance counters (libretro):\n");
+   log_counters(perf_counters_libretro, perf_ptr_libretro);
+}
+
+retro_perf_tick_t rarch_get_perf_counter(void)
+{
+   retro_perf_tick_t time = 0;
 #ifdef _XBOX1
 
 #define rdtsc	__asm __emit 0fh __asm __emit 031h
@@ -94,31 +150,34 @@ rarch_perf_tick_t rarch_get_perf_counter(void)
 #elif defined(__linux__) || defined(__QNX__)
    struct timespec tv;
    if (clock_gettime(CLOCK_MONOTONIC, &tv) == 0)
-      time = (rarch_perf_tick_t)tv.tv_sec * 1000000000 + (rarch_perf_tick_t)tv.tv_nsec;
+      time = (retro_perf_tick_t)tv.tv_sec * 1000000000 + (retro_perf_tick_t)tv.tv_nsec;
    else
       time = 0;
 
-#elif defined(__GNUC__) && !defined(RARCH_CONSOLE)
+#elif defined(__GNUC__) && !defined(RARCH_CONSOLE) 
 
 #if defined(__i386__) || defined(__i486__) || defined(__i686__)
    asm volatile ("rdtsc" : "=A" (time));
 #elif defined(__x86_64__)
    unsigned a, d;
    asm volatile ("rdtsc" : "=a" (a), "=d" (d));
-   time = (rarch_perf_tick_t)a | ((rarch_perf_tick_t)d << 32);
+   time = (retro_perf_tick_t)a | ((retro_perf_tick_t)d << 32);
 #endif
 
 #elif defined(__ARM_ARCH_6__)
-    asm volatile( "mrc p15, 0, %0, c9, c13, 0" : "=r"(time) );
-#elif defined(__CELLOS_LV2__) || defined(GEKKO) || defined(_XBOX360)
+   asm volatile( "mrc p15, 0, %0, c9, c13, 0" : "=r"(time) );
+#elif defined(__CELLOS_LV2__) || defined(GEKKO) || defined(_XBOX360) || defined(__powerpc__) || defined(__ppc__) || defined(__POWERPC__)
    time = __mftb();
+#elif defined(__mips__)
+   struct timeval tv;
+   gettimeofday(&tv,NULL);
+   time = (1000000 * tv.tv_sec + tv.tv_usec);
 #endif
 
    return time;
 }
-#endif
 
-rarch_time_t rarch_get_time_usec(void)
+retro_time_t rarch_get_time_usec(void)
 {
 #if defined(_WIN32)
    static LARGE_INTEGER freq;
@@ -145,6 +204,12 @@ rarch_time_t rarch_get_time_usec(void)
    if (clock_gettime(CLOCK_MONOTONIC, &tv) < 0)
       return 0;
    return tv.tv_sec * INT64_C(1000000) + (tv.tv_nsec + 500) / 1000;
+#elif defined(EMSCRIPTEN)
+   return emscripten_get_now() * 1000;
+#elif defined(__mips__)
+   struct timeval tv;
+   gettimeofday(&tv,NULL);
+   return (1000000 * tv.tv_sec + tv.tv_usec);
 #else
 #error "Your platform does not have a timer function implemented in rarch_get_time_usec(). Cannot continue."
 #endif
@@ -185,11 +250,48 @@ static void x86_cpuid(int func, int flags[4])
    memset(flags, 0, 4 * sizeof(int));
 #endif
 }
+
+// Only runs on i686 and above. Needs to be conditionally run.
+static uint64_t xgetbv_x86(uint32_t index)
+{
+#if defined(__GNUC__)
+   uint32_t eax, edx;
+   asm volatile (
+         // Older GCC versions (Apple's GCC for example) do not understand xgetbv instruction.
+         // Stamp out the machine code directly.
+         ".byte 0x0f, 0x01, 0xd0\n"
+         : "=a"(eax), "=d"(edx) : "c"(index));
+   return ((uint64_t)edx << 32) | eax;
+#elif _MSC_FULL_VER >= 160040219 // Intrinsic only works on 2010 SP1 and above.
+   return _xgetbv(index);
+#else
+   RARCH_WARN("Unknown compiler. Cannot check xgetbv bits.\n");
+   return 0;
+#endif
+}
 #endif
 
-void rarch_get_cpu_features(struct rarch_cpu_features *cpu)
+#ifdef HAVE_NEON
+static void arm_enable_runfast_mode(void)
 {
-   memset(cpu, 0, sizeof(*cpu));
+   // RunFast mode. Enables flush-to-zero and some floating point optimizations.
+   static const unsigned x = 0x04086060;
+   static const unsigned y = 0x03000000;
+   int r;
+   asm volatile(
+         "fmrx	%0, fpscr   \n\t" // r0 = FPSCR
+         "and	%0, %0, %1  \n\t" // r0 = r0 & 0x04086060
+         "orr	%0, %0, %2  \n\t" // r0 = r0 | 0x03000000
+         "fmxr	fpscr, %0   \n\t" // FPSCR = r0
+         : "=r"(r)
+         : "r"(x), "r"(y)
+        );
+}
+#endif
+
+uint64_t rarch_get_cpu_features(void)
+{
+   uint64_t cpu = 0;
 
 #if defined(CPU_X86)
    int flags[4];
@@ -200,39 +302,100 @@ void rarch_get_cpu_features(struct rarch_cpu_features *cpu)
    memcpy(vendor, vendor_shuffle, sizeof(vendor_shuffle));
    RARCH_LOG("[CPUID]: Vendor: %s\n", vendor);
 
-   if (flags[0] < 1) // Does CPUID not support func = 1? (unlikely ...)
-      return;
+   unsigned max_flag = flags[0];
+   if (max_flag < 1) // Does CPUID not support func = 1? (unlikely ...)
+      return 0;
 
    x86_cpuid(1, flags);
 
+   if (flags[3] & (1 << 23))
+      cpu |= RETRO_SIMD_MMX;
+
    if (flags[3] & (1 << 25))
-      cpu->simd |= RARCH_SIMD_SSE;
+   {
+      // SSE also implies MMXEXT (according to FFmpeg source).
+      cpu |= RETRO_SIMD_SSE;
+      cpu |= RETRO_SIMD_MMXEXT;
+   }
 
    if (flags[3] & (1 << 26))
-      cpu->simd |= RARCH_SIMD_SSE2;
+      cpu |= RETRO_SIMD_SSE2;
+
+   if (flags[2] & (1 << 0))
+      cpu |= RETRO_SIMD_SSE3;
+
+   if (flags[2] & (1 << 9))
+      cpu |= RETRO_SIMD_SSSE3;
+
+   if (flags[2] & (1 << 19))
+      cpu |= RETRO_SIMD_SSE4;
+
+   if (flags[2] & (1 << 20))
+      cpu |= RETRO_SIMD_SSE42;
 
    const int avx_flags = (1 << 27) | (1 << 28);
-   if ((flags[2] & avx_flags) == avx_flags)
-      cpu->simd |= RARCH_SIMD_AVX;
+   // Must only perform xgetbv check if we have AVX CPU support (guaranteed to have at least i686).
+   if (((flags[2] & avx_flags) == avx_flags) && ((xgetbv_x86(0) & 0x6) == 0x6))
+      cpu |= RETRO_SIMD_AVX;
 
-   RARCH_LOG("[CPUID]: SSE:  %u\n", !!(cpu->simd & RARCH_SIMD_SSE));
-   RARCH_LOG("[CPUID]: SSE2: %u\n", !!(cpu->simd & RARCH_SIMD_SSE2));
-   RARCH_LOG("[CPUID]: AVX:  %u\n", !!(cpu->simd & RARCH_SIMD_AVX));
+   if (max_flag >= 7)
+   {
+      x86_cpuid(7, flags);
+      if (flags[1] & (1 << 5))
+         cpu |= RETRO_SIMD_AVX2;
+   }
+
+   x86_cpuid(0x80000000, flags);
+   max_flag = flags[0];
+   if (max_flag >= 0x80000001u)
+   {
+      x86_cpuid(0x80000001, flags);
+      if (flags[3] & (1 << 23))
+         cpu |= RETRO_SIMD_MMX;
+      if (flags[3] & (1 << 22))
+         cpu |= RETRO_SIMD_MMXEXT;
+   }
+
+   RARCH_LOG("[CPUID]: MMX:    %u\n", !!(cpu & RETRO_SIMD_MMX));
+   RARCH_LOG("[CPUID]: MMXEXT: %u\n", !!(cpu & RETRO_SIMD_MMXEXT));
+   RARCH_LOG("[CPUID]: SSE:    %u\n", !!(cpu & RETRO_SIMD_SSE));
+   RARCH_LOG("[CPUID]: SSE2:   %u\n", !!(cpu & RETRO_SIMD_SSE2));
+   RARCH_LOG("[CPUID]: SSE3:   %u\n", !!(cpu & RETRO_SIMD_SSE3));
+   RARCH_LOG("[CPUID]: SSSE3:  %u\n", !!(cpu & RETRO_SIMD_SSSE3));
+   RARCH_LOG("[CPUID]: SSE4:   %u\n", !!(cpu & RETRO_SIMD_SSE4));
+   RARCH_LOG("[CPUID]: SSE4.2: %u\n", !!(cpu & RETRO_SIMD_SSE42));
+   RARCH_LOG("[CPUID]: AVX:    %u\n", !!(cpu & RETRO_SIMD_AVX));
+   RARCH_LOG("[CPUID]: AVX2:   %u\n", !!(cpu & RETRO_SIMD_AVX2));
 #elif defined(ANDROID) && defined(ANDROID_ARM)
    uint64_t cpu_flags = android_getCpuFeatures();
+   (void)cpu_flags;
 
+#ifdef HAVE_NEON
    if (cpu_flags & ANDROID_CPU_ARM_FEATURE_NEON)
-      cpu->simd |= RARCH_SIMD_NEON;
-
-   RARCH_LOG("[CPUID]: NEON: %u\n", !!(cpu->simd & RARCH_SIMD_NEON));
-#elif defined(HAVE_NEON)
-   cpu->simd |= RARCH_SIMD_NEON;
-   RARCH_LOG("[CPUID]: NEON: %u\n", !!(cpu->simd & RARCH_SIMD_NEON));
-#elif defined(__CELLOS_LV2__)
-   cpu->simd |= RARCH_SIMD_VMX;
-   RARCH_LOG("[CPUID]: VMX: %u\n", !!(cpu->simd & RARCH_SIMD_VMX));
-#elif defined(XBOX360)
-   cpu->simd |= RARCH_SIMD_VMX128;
-   RARCH_LOG("[CPUID]: VMX128: %u\n", !!(cpu->simd & RARCH_SIMD_VMX128));
+   {
+      cpu |= RETRO_SIMD_NEON;
+      arm_enable_runfast_mode();
+   }
 #endif
+
+   RARCH_LOG("[CPUID]: NEON: %u\n", !!(cpu & RETRO_SIMD_NEON));
+#elif defined(HAVE_NEON)
+   cpu |= RETRO_SIMD_NEON;
+   arm_enable_runfast_mode();
+   RARCH_LOG("[CPUID]: NEON: %u\n", !!(cpu & RETRO_SIMD_NEON));
+#elif defined(__ALTIVEC__)
+   cpu |= RETRO_SIMD_VMX;
+   RARCH_LOG("[CPUID]: VMX: %u\n", !!(cpu & RETRO_SIMD_VMX));
+#elif defined(XBOX360)
+   cpu |= RETRO_SIMD_VMX128;
+   RARCH_LOG("[CPUID]: VMX128: %u\n", !!(cpu & RETRO_SIMD_VMX128));
+#elif defined(PSP)
+   cpu |= RETRO_SIMD_VFPU;
+   RARCH_LOG("[CPUID]: VFPU: %u\n", !!(cpu & RETRO_SIMD_VFPU));
+#elif defined(GEKKO)
+   cpu |= RETRO_SIMD_PS;
+   RARCH_LOG("[CPUID]: PS: %u\n", !!(cpu & RETRO_SIMD_PS));
+#endif
+
+   return cpu;
 }

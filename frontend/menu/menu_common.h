@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
- *
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
+ * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
  *  ation, either version 3 of the License, or (at your option) any later version.
@@ -17,9 +17,14 @@
 #ifndef MENU_COMMON_H__
 #define MENU_COMMON_H__
 
+#include "../../general.h"
+
 #ifdef HAVE_CONFIG_H
 #include "../../config.h"
 #endif
+
+#include "../../performance.h"
+#include "../info/core_info.h"
 
 #ifdef HAVE_RGUI
 #define MENU_TEXTURE_FULLSCREEN false
@@ -27,13 +32,13 @@
 #define MENU_TEXTURE_FULLSCREEN true
 #endif
 
+#include "../../boolean.h"
 
-
-#ifdef HAVE_FILEBROWSER
-#include "utils/file_browser.h"
-#else
-#include "utils/file_list.h"
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+#include "file_list.h"
 
 #if defined(HAVE_CG) || defined(HAVE_HLSL) || defined(HAVE_GLSL)
 #define HAVE_SHADER_MANAGER
@@ -42,50 +47,8 @@
 
 #include "history.h"
 
-#define RGUI_MAX_SHADERS 8
-
-#if defined(HAVE_RMENU) || defined(HAVE_RMENU_XUI)
-enum
-{
-   DEVICE_NAV_UP = 0,
-   DEVICE_NAV_DOWN,
-   DEVICE_NAV_LEFT,
-   DEVICE_NAV_RIGHT,
-   DEVICE_NAV_UP_ANALOG_L,
-   DEVICE_NAV_DOWN_ANALOG_L,
-   DEVICE_NAV_LEFT_ANALOG_L,
-   DEVICE_NAV_RIGHT_ANALOG_L,
-   DEVICE_NAV_UP_ANALOG_R,
-   DEVICE_NAV_DOWN_ANALOG_R,
-   DEVICE_NAV_LEFT_ANALOG_R,
-   DEVICE_NAV_RIGHT_ANALOG_R,
-   DEVICE_NAV_B,
-   DEVICE_NAV_A,
-   DEVICE_NAV_X,
-   DEVICE_NAV_Y,
-   DEVICE_NAV_START,
-   DEVICE_NAV_SELECT,
-   DEVICE_NAV_L1,
-   DEVICE_NAV_R1,
-   DEVICE_NAV_L2,
-   DEVICE_NAV_R2,
-   DEVICE_NAV_MENU,
-   DEVICE_NAV_LAST
-};
-#elif defined(HAVE_RGUI)
-enum
-{
-   DEVICE_NAV_UP = 0,
-   DEVICE_NAV_DOWN,
-   DEVICE_NAV_LEFT,
-   DEVICE_NAV_RIGHT,
-   DEVICE_NAV_A,
-   DEVICE_NAV_B,
-   DEVICE_NAV_START,
-   DEVICE_NAV_SELECT,
-   DEVICE_NAV_MENU,
-   DEVICE_NAV_LAST
-};
+#ifndef GFX_MAX_SHADERS
+#define GFX_MAX_SHADERS 16
 #endif
 
 typedef enum
@@ -95,28 +58,41 @@ typedef enum
    RGUI_FILE_DEVICE,
    RGUI_FILE_USE_DIRECTORY,
    RGUI_SETTINGS,
+   RGUI_START_SCREEN,
 
    // Shader stuff
+   RGUI_SETTINGS_GENERAL_OPTIONS,
    RGUI_SETTINGS_VIDEO_OPTIONS,
    RGUI_SETTINGS_VIDEO_OPTIONS_FIRST,
-#ifdef GEKKO
    RGUI_SETTINGS_VIDEO_RESOLUTION,
-#endif
+   RGUI_SETTINGS_VIDEO_PAL60,
    RGUI_SETTINGS_VIDEO_FILTER,
    RGUI_SETTINGS_VIDEO_SOFT_FILTER,
+   RGUI_SETTINGS_FLICKER_FILTER,
+   RGUI_SETTINGS_SOFT_DISPLAY_FILTER,
    RGUI_SETTINGS_VIDEO_GAMMA,
    RGUI_SETTINGS_VIDEO_INTEGER_SCALE,
    RGUI_SETTINGS_VIDEO_ASPECT_RATIO,
    RGUI_SETTINGS_CUSTOM_VIEWPORT,
    RGUI_SETTINGS_CUSTOM_VIEWPORT_2,
    RGUI_SETTINGS_TOGGLE_FULLSCREEN,
+   RGUI_SETTINGS_VIDEO_THREADED,
    RGUI_SETTINGS_VIDEO_ROTATION,
    RGUI_SETTINGS_VIDEO_VSYNC,
    RGUI_SETTINGS_VIDEO_HARD_SYNC,
    RGUI_SETTINGS_VIDEO_HARD_SYNC_FRAMES,
+   RGUI_SETTINGS_VIDEO_BLACK_FRAME_INSERTION,
+   RGUI_SETTINGS_VIDEO_SWAP_INTERVAL,
+   RGUI_SETTINGS_VIDEO_WINDOW_SCALE_X,
+   RGUI_SETTINGS_VIDEO_WINDOW_SCALE_Y,
+   RGUI_SETTINGS_VIDEO_CROP_OVERSCAN,
    RGUI_SETTINGS_VIDEO_REFRESH_RATE_AUTO,
+   RGUI_SETTINGS_VIDEO_MONITOR_INDEX,
    RGUI_SETTINGS_VIDEO_OPTIONS_LAST,
-#ifdef HAVE_SHADER_MANAGER
+   RGUI_SETTINGS_FONT_OPTIONS,
+   RGUI_SETTINGS_FONT_ENABLE,
+   RGUI_SETTINGS_FONT_SCALE,
+   RGUI_SETTINGS_FONT_SIZE,
    RGUI_SETTINGS_SHADER_OPTIONS,
    RGUI_SETTINGS_SHADER_FILTER,
    RGUI_SETTINGS_SHADER_PRESET,
@@ -125,73 +101,159 @@ typedef enum
    RGUI_SETTINGS_SHADER_0,
    RGUI_SETTINGS_SHADER_0_FILTER,
    RGUI_SETTINGS_SHADER_0_SCALE,
-   RGUI_SETTINGS_SHADER_LAST = RGUI_SETTINGS_SHADER_0_SCALE + (3 * (RGUI_MAX_SHADERS - 1)),
-#endif
+   RGUI_SETTINGS_SHADER_LAST = RGUI_SETTINGS_SHADER_0_SCALE + (3 * (GFX_MAX_SHADERS - 1)),
+   RGUI_SETTINGS_SHADER_PRESET_SAVE,
 
    // settings options are done here too
    RGUI_SETTINGS_OPEN_FILEBROWSER,
+   RGUI_SETTINGS_OPEN_FILEBROWSER_DEFERRED_CORE,
    RGUI_SETTINGS_OPEN_HISTORY,
    RGUI_SETTINGS_CORE,
+   RGUI_SETTINGS_CORE_INFO,
+   RGUI_SETTINGS_DEFERRED_CORE,
+   RGUI_SETTINGS_CONFIG,
+   RGUI_SETTINGS_SAVE_CONFIG,
    RGUI_SETTINGS_CORE_OPTIONS,
    RGUI_SETTINGS_AUDIO_OPTIONS,
    RGUI_SETTINGS_INPUT_OPTIONS,
    RGUI_SETTINGS_PATH_OPTIONS,
+   RGUI_SETTINGS_OVERLAY_OPTIONS,
+   RGUI_SETTINGS_NETPLAY_OPTIONS,
+   RGUI_SETTINGS_PRIVACY_OPTIONS,
    RGUI_SETTINGS_OPTIONS,
+   RGUI_SETTINGS_DRIVERS,
    RGUI_SETTINGS_REWIND_ENABLE,
    RGUI_SETTINGS_REWIND_GRANULARITY,
    RGUI_SETTINGS_CONFIG_SAVE_ON_EXIT,
+   RGUI_SETTINGS_PER_CORE_CONFIG,
    RGUI_SETTINGS_SRAM_AUTOSAVE,
    RGUI_SETTINGS_SAVESTATE_SAVE,
    RGUI_SETTINGS_SAVESTATE_LOAD,
    RGUI_SETTINGS_DISK_OPTIONS,
    RGUI_SETTINGS_DISK_INDEX,
    RGUI_SETTINGS_DISK_APPEND,
-#ifdef HAVE_SCREENSHOTS
+   RGUI_SETTINGS_DRIVER_VIDEO,
+   RGUI_SETTINGS_DRIVER_AUDIO,
+   RGUI_SETTINGS_DRIVER_AUDIO_DEVICE,
+   RGUI_SETTINGS_DRIVER_AUDIO_RESAMPLER,
+   RGUI_SETTINGS_DRIVER_INPUT,
+   RGUI_SETTINGS_DRIVER_CAMERA,
+   RGUI_SETTINGS_DRIVER_LOCATION,
+   RGUI_SETTINGS_DRIVER_MENU,
    RGUI_SETTINGS_SCREENSHOT,
-#endif
+   RGUI_SETTINGS_GPU_SCREENSHOT,
+   RGUI_SETTINGS_SAVESTATE_AUTO_SAVE,
+   RGUI_SETTINGS_SAVESTATE_AUTO_LOAD,
+   RGUI_SETTINGS_BLOCK_SRAM_OVERWRITE,
+   RGUI_SETTINGS_WINDOW_COMPOSITING_ENABLE,
+   RGUI_SETTINGS_PAUSE_IF_WINDOW_FOCUS_LOST,
+   RGUI_SCREENSHOT_DIR_PATH,
    RGUI_BROWSER_DIR_PATH,
    RGUI_SHADER_DIR_PATH,
    RGUI_SAVESTATE_DIR_PATH,
    RGUI_SAVEFILE_DIR_PATH,
-#ifdef HAVE_OVERLAY
+   RGUI_LIBRETRO_DIR_PATH,
+   RGUI_LIBRETRO_INFO_DIR_PATH,
+   RGUI_CONFIG_DIR_PATH,
    RGUI_OVERLAY_DIR_PATH,
-#endif
    RGUI_SYSTEM_DIR_PATH,
    RGUI_SETTINGS_RESTART_GAME,
    RGUI_SETTINGS_AUDIO_MUTE,
    RGUI_SETTINGS_AUDIO_CONTROL_RATE_DELTA,
+   RGUI_SETTINGS_AUDIO_DSP_EFFECT,
+   RGUI_SETTINGS_AUDIO_VOLUME,
+   RGUI_SETTINGS_CUSTOM_BGM_CONTROL_ENABLE,
    RGUI_SETTINGS_ZIP_EXTRACT,
    RGUI_SETTINGS_DEBUG_TEXT,
    RGUI_SETTINGS_RESTART_EMULATOR,
    RGUI_SETTINGS_RESUME_GAME,
    RGUI_SETTINGS_QUIT_RARCH,
 
-#ifdef HAVE_OVERLAY
+   RGUI_SETTINGS_NETPLAY_ENABLE,
+   RGUI_SETTINGS_NETPLAY_MODE,
+   RGUI_SETTINGS_NETPLAY_SPECTATOR_MODE_ENABLE,
+   RGUI_SETTINGS_NETPLAY_HOST_IP_ADDRESS,
+   RGUI_SETTINGS_NETPLAY_TCP_UDP_PORT,
+   RGUI_SETTINGS_NETPLAY_DELAY_FRAMES,
+   RGUI_SETTINGS_NETPLAY_NICKNAME,
+
+   RGUI_SETTINGS_PRIVACY_CAMERA_ALLOW,
+   RGUI_SETTINGS_PRIVACY_LOCATION_ALLOW,
+
    RGUI_SETTINGS_OVERLAY_PRESET,
    RGUI_SETTINGS_OVERLAY_OPACITY,
    RGUI_SETTINGS_OVERLAY_SCALE,
-#endif
    RGUI_SETTINGS_BIND_PLAYER,
    RGUI_SETTINGS_BIND_DEVICE,
    RGUI_SETTINGS_BIND_DEVICE_TYPE,
-   RGUI_SETTINGS_BIND_DPAD_EMULATION,
+   RGUI_SETTINGS_BIND_ANALOG_MODE,
+   RGUI_SETTINGS_DEVICE_AUTODETECT_ENABLE,
+
+   // Match up with libretro order for simplicity.
+   RGUI_SETTINGS_BIND_BEGIN,
+   RGUI_SETTINGS_BIND_B = RGUI_SETTINGS_BIND_BEGIN,
+   RGUI_SETTINGS_BIND_Y,
+   RGUI_SETTINGS_BIND_SELECT,
+   RGUI_SETTINGS_BIND_START,
    RGUI_SETTINGS_BIND_UP,
    RGUI_SETTINGS_BIND_DOWN,
    RGUI_SETTINGS_BIND_LEFT,
    RGUI_SETTINGS_BIND_RIGHT,
    RGUI_SETTINGS_BIND_A,
-   RGUI_SETTINGS_BIND_B,
    RGUI_SETTINGS_BIND_X,
-   RGUI_SETTINGS_BIND_Y,
-   RGUI_SETTINGS_BIND_START,
-   RGUI_SETTINGS_BIND_SELECT,
    RGUI_SETTINGS_BIND_L,
    RGUI_SETTINGS_BIND_R,
    RGUI_SETTINGS_BIND_L2,
    RGUI_SETTINGS_BIND_R2,
    RGUI_SETTINGS_BIND_L3,
    RGUI_SETTINGS_BIND_R3,
+   RGUI_SETTINGS_BIND_ANALOG_LEFT_X_PLUS,
+   RGUI_SETTINGS_BIND_ANALOG_LEFT_X_MINUS,
+   RGUI_SETTINGS_BIND_ANALOG_LEFT_Y_PLUS,
+   RGUI_SETTINGS_BIND_ANALOG_LEFT_Y_MINUS,
+   RGUI_SETTINGS_BIND_ANALOG_RIGHT_X_PLUS,
+   RGUI_SETTINGS_BIND_ANALOG_RIGHT_X_MINUS,
+   RGUI_SETTINGS_BIND_ANALOG_RIGHT_Y_PLUS,
+   RGUI_SETTINGS_BIND_ANALOG_RIGHT_Y_MINUS,
 
+   RGUI_SETTINGS_BIND_TURBO_ENABLE,
+   RGUI_SETTINGS_BIND_FAST_FORWARD_KEY,
+   RGUI_SETTINGS_BIND_FAST_FORWARD_HOLD_KEY,
+   RGUI_SETTINGS_BIND_LOAD_STATE_KEY,
+   RGUI_SETTINGS_BIND_SAVE_STATE_KEY,
+   RGUI_SETTINGS_BIND_FULLSCREEN_TOGGLE_KEY,
+   RGUI_SETTINGS_BIND_QUIT_KEY,
+   RGUI_SETTINGS_BIND_STATE_SLOT_PLUS,
+   RGUI_SETTINGS_BIND_STATE_SLOT_MINUS,
+   RGUI_SETTINGS_BIND_REWIND,
+   RGUI_SETTINGS_BIND_MOVIE_RECORD_TOGGLE,
+   RGUI_SETTINGS_BIND_PAUSE_TOGGLE,
+   RGUI_SETTINGS_BIND_FRAMEADVANCE,
+   RGUI_SETTINGS_BIND_RESET,
+   RGUI_SETTINGS_BIND_SHADER_NEXT,
+   RGUI_SETTINGS_BIND_SHADER_PREV,
+   RGUI_SETTINGS_BIND_CHEAT_INDEX_PLUS,
+   RGUI_SETTINGS_BIND_CHEAT_INDEX_MINUS,
+   RGUI_SETTINGS_BIND_CHEAT_TOGGLE,
+   RGUI_SETTINGS_BIND_SCREENSHOT,
+   RGUI_SETTINGS_BIND_DSP_CONFIG,
+   RGUI_SETTINGS_BIND_MUTE,
+   RGUI_SETTINGS_BIND_NETPLAY_FLIP,
+   RGUI_SETTINGS_BIND_SLOWMOTION,
+   RGUI_SETTINGS_BIND_ENABLE_HOTKEY,
+   RGUI_SETTINGS_BIND_VOLUME_UP,
+   RGUI_SETTINGS_BIND_VOLUME_DOWN,
+   RGUI_SETTINGS_BIND_OVERLAY_NEXT,
+   RGUI_SETTINGS_BIND_DISK_EJECT_TOGGLE,
+   RGUI_SETTINGS_BIND_DISK_NEXT,
+   RGUI_SETTINGS_BIND_GRAB_MOUSE_TOGGLE,
+   RGUI_SETTINGS_BIND_MENU_TOGGLE,
+   RGUI_SETTINGS_CUSTOM_BIND,
+   RGUI_SETTINGS_CUSTOM_BIND_ALL,
+   RGUI_SETTINGS_CUSTOM_BIND_DEFAULT_ALL,
+   RGUI_SETTINGS_ONSCREEN_KEYBOARD_ENABLE,
+   RGUI_SETTINGS_BIND_LAST = RGUI_SETTINGS_BIND_ANALOG_RIGHT_Y_MINUS,
+   RGUI_SETTINGS_CORE_INFO_NONE = 0xffff,
    RGUI_SETTINGS_CORE_OPTION_NONE = 0xffff,
    RGUI_SETTINGS_CORE_OPTION_START = 0x10000
 } rgui_file_type_t;
@@ -205,11 +267,90 @@ typedef enum
    RGUI_ACTION_OK,
    RGUI_ACTION_CANCEL,
    RGUI_ACTION_REFRESH,
-   RGUI_ACTION_SETTINGS,
    RGUI_ACTION_START,
    RGUI_ACTION_MESSAGE,
+   RGUI_ACTION_SCROLL_DOWN,
+   RGUI_ACTION_SCROLL_UP,
+   RGUI_ACTION_MAPPING_PREVIOUS,
+   RGUI_ACTION_MAPPING_NEXT,
    RGUI_ACTION_NOOP
 } rgui_action_t;
+
+#define RGUI_MAX_BUTTONS 32
+#define RGUI_MAX_AXES 32
+#define RGUI_MAX_HATS 4
+struct rgui_bind_state_port
+{
+   bool buttons[RGUI_MAX_BUTTONS];
+   int16_t axes[RGUI_MAX_AXES];
+   uint16_t hats[RGUI_MAX_HATS];
+};
+
+struct rgui_bind_axis_state
+{
+   // Default axis state.
+   int16_t rested_axes[RGUI_MAX_AXES];
+   // Locked axis state. If we configured an axis, avoid having the same axis state trigger something again right away.
+   int16_t locked_axes[RGUI_MAX_AXES];
+};
+
+struct rgui_bind_state
+{
+   struct retro_keybind *target;
+   unsigned begin;
+   unsigned last;
+   unsigned player;
+   struct rgui_bind_state_port state[MAX_PLAYERS];
+   struct rgui_bind_axis_state axis_state[MAX_PLAYERS];
+   bool skip;
+};
+
+void menu_poll_bind_get_rested_axes(struct rgui_bind_state *state);
+void menu_poll_bind_state(struct rgui_bind_state *state);
+bool menu_poll_find_trigger(struct rgui_bind_state *state, struct rgui_bind_state *new_state);
+
+#ifdef GEKKO
+enum
+{
+   GX_RESOLUTIONS_512_192 = 0,
+   GX_RESOLUTIONS_598_200,
+   GX_RESOLUTIONS_640_200,
+   GX_RESOLUTIONS_384_224,
+   GX_RESOLUTIONS_448_224,
+   GX_RESOLUTIONS_480_224,
+   GX_RESOLUTIONS_512_224,
+   GX_RESOLUTIONS_576_224,
+   GX_RESOLUTIONS_608_224,
+   GX_RESOLUTIONS_640_224,
+   GX_RESOLUTIONS_340_232,
+   GX_RESOLUTIONS_512_232,
+   GX_RESOLUTIONS_512_236,
+   GX_RESOLUTIONS_336_240,
+   GX_RESOLUTIONS_384_240,
+   GX_RESOLUTIONS_512_240,
+   GX_RESOLUTIONS_530_240,
+   GX_RESOLUTIONS_640_240,
+   GX_RESOLUTIONS_512_384,
+   GX_RESOLUTIONS_598_400,
+   GX_RESOLUTIONS_640_400,
+   GX_RESOLUTIONS_384_448,
+   GX_RESOLUTIONS_448_448,
+   GX_RESOLUTIONS_480_448,
+   GX_RESOLUTIONS_512_448,
+   GX_RESOLUTIONS_576_448, 
+   GX_RESOLUTIONS_608_448, 
+   GX_RESOLUTIONS_640_448, 
+   GX_RESOLUTIONS_340_464, 
+   GX_RESOLUTIONS_512_464, 
+   GX_RESOLUTIONS_512_472, 
+   GX_RESOLUTIONS_384_480,
+   GX_RESOLUTIONS_512_480,
+   GX_RESOLUTIONS_530_480,
+   GX_RESOLUTIONS_640_480,
+   GX_RESOLUTIONS_LAST,
+};
+#endif
+
 
 typedef struct
 {
@@ -220,45 +361,56 @@ typedef struct
    unsigned delay_timer;
    unsigned delay_count;
 
+   unsigned width;
+   unsigned height;
+
    uint16_t *frame_buf;
    size_t frame_buf_pitch;
    bool frame_buf_show;
 
-#ifdef HAVE_FILEBROWSER
-   filebrowser_t *browser;
-   unsigned menu_type;
-#else
-   rgui_list_t *menu_stack;
-   rgui_list_t *selection_buf;
-#endif
+   file_list_t *menu_stack;
+   file_list_t *selection_buf;
    size_t selection_ptr;
    bool need_refresh;
    bool msg_force;
+   bool push_start_screen;
 
-   char base_path[PATH_MAX];
+   core_info_list_t *core_info;
+   core_info_t core_info_current;
+   bool defer_core;
+   char deferred_path[PATH_MAX];
+
+   // Quick jumping indices with L/R.
+   // Rebuilt when parsing directory.
+   size_t scroll_indices[2 * (26 + 2) + 1];
+   unsigned scroll_indices_size;
+   unsigned scroll_accel;
+
+   char default_glslp[PATH_MAX];
+   char default_cgp[PATH_MAX];
 
    const uint8_t *font;
    bool alloc_font;
 
-#ifdef HAVE_DYNAMIC
    char libretro_dir[PATH_MAX];
-#endif
    struct retro_system_info info;
    bool load_no_rom;
 
-#ifdef HAVE_OSKUTIL
-   unsigned osk_param;
-   oskutil_params oskutil_handle;
-   bool (*osk_init)(void *data);
-   bool (*osk_callback)(void *data);
-#endif
 #ifdef HAVE_SHADER_MANAGER
    struct gfx_shader shader;
 #endif
    unsigned current_pad;
 
    rom_history_t *history;
-   rarch_time_t last_time; // Used to throttle RGUI in case VSync is broken.
+   retro_time_t last_time; // Used to throttle RGUI in case VSync is broken.
+
+   struct rgui_bind_state binds;
+   struct
+   {
+      const char **buffer;
+      const char *label;
+      bool display;
+   } keyboard;
 } rgui_handle_t;
 
 extern rgui_handle_t *rgui;
@@ -267,32 +419,43 @@ void menu_init(void);
 bool menu_iterate(void);
 void menu_free(void);
 
-int rgui_iterate(rgui_handle_t *rgui);
-
-rgui_handle_t *rgui_init(void);
-void rgui_free(rgui_handle_t *rgui);
-
-#ifndef HAVE_RMENU_XUI
-#if defined(HAVE_RGUI) || defined(HAVE_RMENU)
-int rgui_input_postprocess(void *data, uint64_t old_state);
-#endif
-#endif
-
 #ifdef HAVE_SHADER_MANAGER
-void shader_manager_init(rgui_handle_t *rgui);
+void shader_manager_init(void *data);
 void shader_manager_get_str(struct gfx_shader *shader,
       char *type_str, size_t type_str_size, unsigned type);
+void shader_manager_set_preset(struct gfx_shader *shader,
+      enum rarch_shader_type type, const char *path);
+void shader_manager_save_preset(void *data, const char *basename, bool apply);
 #endif
 
 void menu_ticker_line(char *buf, size_t len, unsigned tick, const char *str, bool selected);
 
+void menu_init_core_info(void *data);
+
 void load_menu_game_prepare(void);
+void load_menu_game_prepare_dummy(void);
 bool load_menu_game(void);
 void load_menu_game_history(unsigned game_index);
+extern void load_menu_game_new_core(void);
 void menu_rom_history_push(const char *path, const char *core_path,
       const char *core_name);
 void menu_rom_history_push_current(void);
 
+bool menu_replace_config(const char *path);
 
+bool menu_save_new_config(void);
+
+int menu_settings_toggle_setting(void *data, unsigned setting, unsigned action, unsigned menu_type);
+int menu_set_settings(void *data, unsigned setting, unsigned action);
+void menu_set_settings_label(char *type_str, size_t type_str_size, unsigned *w, unsigned type);
+
+void menu_populate_entries(void *data, unsigned menu_type);
+unsigned menu_type_is(unsigned type);
+
+uint64_t menu_input(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

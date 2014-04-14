@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -39,22 +39,24 @@ struct rxml_node *rxml_root_node(rxml_document_t *doc)
 
 static void rxml_free_node(struct rxml_node *node)
 {
-   for (struct rxml_node *head = node->children; head; )
+   struct rxml_node *head;
+   for (head = node->children; head; )
    {
       struct rxml_node *next_node = head->next;
       rxml_free_node(head);
       head = next_node;
    }
 
-   for (struct rxml_attrib_node *head = node->attrib; head; )
+   struct rxml_attrib_node *attrib_node_head;
+   for (attrib_node_head = node->attrib; attrib_node_head; )
    {
-      struct rxml_attrib_node *next_attrib = head->next;
+      struct rxml_attrib_node *next_attrib = attrib_node_head->next;
 
-      free(head->attrib);
-      free(head->value);
-      free(head);
+      free(attrib_node_head->attrib);
+      free(attrib_node_head->value);
+      free(attrib_node_head);
 
-      head = next_attrib;
+      attrib_node_head = next_attrib;
    }
 
    free(node->name);
@@ -127,6 +129,8 @@ static struct rxml_attrib_node *rxml_parse_attrs(const char *str)
    struct rxml_attrib_node *list = NULL;
    struct rxml_attrib_node *tail = NULL;
 
+   char *attrib = NULL;
+   char *value = NULL;
    char *save;
    const char *elem = strtok_r(copy, " \n\t\f\v\r", &save);
    while (elem)
@@ -139,8 +143,8 @@ static struct rxml_attrib_node *rxml_parse_attrs(const char *str)
       if (!end || end != (elem + strlen(elem) - 1))
          goto end;
 
-      char *attrib = strdup_range_escape(elem, eq);
-      char *value  = strdup_range_escape(eq + 2, end);
+      attrib = strdup_range_escape(elem, eq);
+      value  = strdup_range_escape(eq + 2, end);
       if (!attrib || !value)
          goto end;
 
@@ -150,6 +154,8 @@ static struct rxml_attrib_node *rxml_parse_attrs(const char *str)
 
       new_node->attrib = attrib;
       new_node->value  = value;
+      attrib = NULL;
+      value = NULL;
 
       if (tail)
       {
@@ -164,6 +170,8 @@ static struct rxml_attrib_node *rxml_parse_attrs(const char *str)
 
 end:
    free(copy);
+   free(attrib);
+   free(value);
    return list;
 }
 
@@ -431,7 +439,8 @@ void rxml_free_document(rxml_document_t *doc)
 
 char *rxml_node_attrib(struct rxml_node *node, const char *attrib)
 {
-   for (struct rxml_attrib_node *attribs = node->attrib; attribs; attribs = attribs->next)
+   struct rxml_attrib_node *attribs;
+   for (attribs = node->attrib; attribs; attribs = attribs->next)
    {
       if (!strcmp(attrib, attribs->attrib))
          return attribs->value;

@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -16,10 +16,10 @@
 // SHA256 implementation from bSNES. Written by valditx.
 //
 
-#include "general.h"
-#include "hash.h"
 #include <string.h>
 #include <stdio.h>
+#include "hash.h"
+#include "miscellaneous.h"
 
 #define SWAP32(x) ((uint32_t)(           \
          (((uint32_t)(x) & 0x000000ff) << 24) | \
@@ -28,19 +28,9 @@
          (((uint32_t)(x) & 0xff000000) >> 24)   \
          ))
 
-static inline void store32le(uint32_t *addr, uint32_t data)
-{
-   *addr = is_little_endian() ? data : SWAP32(data);
-}
-
 static inline void store32be(uint32_t *addr, uint32_t data)
 {
    *addr = is_little_endian() ? SWAP32(data) : data;
-}
-
-static inline uint32_t load32le(const uint32_t *addr)
-{
-   return is_little_endian() ? *addr : SWAP32(*addr);
 }
 
 static inline uint32_t load32be(const uint32_t *addr)
@@ -170,12 +160,14 @@ static void sha256_final(struct sha256_ctx *p)
 
 static void sha256_subhash(struct sha256_ctx *p, uint32_t *t) 
 {
-   for (unsigned i = 0; i < 8; i++) 
+   unsigned i;
+   for (i = 0; i < 8; i++) 
       store32be(t++, p->h[i]);
 }
 
 void sha256_hash(char *out, const uint8_t *in, size_t size)
 {
+   unsigned i;
    struct sha256_ctx sha;
 
    union
@@ -189,7 +181,7 @@ void sha256_hash(char *out, const uint8_t *in, size_t size)
    sha256_final(&sha);
    sha256_subhash(&sha, shahash.u32);
 
-   for (unsigned i = 0; i < 32; i++)
+   for (i = 0; i < 32; i++)
       snprintf(out + 2 * i, 3, "%02x", (unsigned)shahash.u8[i]);
 }
 
@@ -248,8 +240,9 @@ uint32_t crc32_adjust(uint32_t crc32, uint8_t input)
 
 uint32_t crc32_calculate(const uint8_t *data, size_t length)
 {
+   size_t i;
    uint32_t crc32 = ~0;
-   for (size_t i = 0; i < length; i++)
+   for (i = 0; i < length; i++)
       crc32 = crc32_adjust(crc32, data[i]);
    return ~crc32;
 }

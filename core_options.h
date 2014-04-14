@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -39,6 +39,10 @@ size_t core_option_size(core_option_manager_t *opt);
 // Gets description and current value for an option.
 const char *core_option_get_desc(core_option_manager_t *opt, size_t index);
 const char *core_option_get_val(core_option_manager_t *opt, size_t index);
+
+// Helpers to present a list of options
+struct string_list *core_option_get_vals(core_option_manager_t *opt, size_t index);
+void core_option_set_val(core_option_manager_t *opt, size_t index, size_t val_index);
 
 // Cycles through options for an option. Options wrap around.
 void core_option_next(core_option_manager_t *opt, size_t index);

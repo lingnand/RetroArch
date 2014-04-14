@@ -1,7 +1,7 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
- *  Copyright (C) 2012-2013 - Michael Lelli
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
+ *  Copyright (C) 2012-2014 - Michael Lelli
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -112,8 +112,9 @@ void libretro_dummy_retro_reset(void)
 
 void libretro_dummy_retro_run(void)
 {
+   unsigned i;
    dummy_input_poll_cb();
-   for (unsigned i = 0; i < 320 * 240; i++)
+   for (i = 0; i < 320 * 240; i++)
       frame_buf[i] = 4 << 5;
    dummy_video_cb(frame_buf, 320, 240, 640);
 }

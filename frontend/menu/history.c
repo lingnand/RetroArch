@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -62,14 +62,15 @@ void rom_history_push(rom_history_t *hist,
       const char *path, const char *core_path,
       const char *core_name)
 {
-   for (size_t i = 0; i < hist->size; i++)
+   size_t i;
+   for (i = 0; i < hist->size; i++)
    {
       bool equal_path = (!path && !hist->entries[i].path) ||
          (path && hist->entries[i].path && !strcmp(path, hist->entries[i].path));
 
-      if (equal_path &&
-            !strcmp(hist->entries[i].core_path, core_path) &&
-            !strcmp(hist->entries[i].core_name, core_name))
+      // Core name can have changed while still being the same core.
+      // Differentiate based on the core path only.
+      if (equal_path && !strcmp(hist->entries[i].core_path, core_path))
       {
          if (i == 0)
             return;
@@ -100,11 +101,12 @@ void rom_history_push(rom_history_t *hist,
 
 static void rom_history_write_file(rom_history_t *hist)
 {
+   size_t i;
    FILE *file = fopen(hist->conf_path, "w");
    if (!file)
       return;
 
-   for (size_t i = 0; i < hist->size; i++)
+   for (i = 0; i < hist->size; i++)
    {
       fprintf(file, "%s\n%s\n%s\n",
             hist->entries[i].path ? hist->entries[i].path : "",
@@ -117,6 +119,7 @@ static void rom_history_write_file(rom_history_t *hist)
 
 void rom_history_free(rom_history_t *hist)
 {
+   size_t i;
    if (!hist)
       return;
 
@@ -124,11 +127,19 @@ void rom_history_free(rom_history_t *hist)
       rom_history_write_file(hist);
    free(hist->conf_path);
 
-   for (size_t i = 0; i < hist->cap; i++)
+   for (i = 0; i < hist->cap; i++)
       rom_history_free_entry(&hist->entries[i]);
    free(hist->entries);
 
    free(hist);
+}
+
+void rom_history_clear(rom_history_t *hist)
+{
+   size_t i;
+   for (i = 0; i < hist->cap; i++)
+      rom_history_free_entry(&hist->entries[i]);
+   hist->size = 0;
 }
 
 size_t rom_history_size(rom_history_t *hist)
@@ -145,10 +156,11 @@ static bool rom_history_read_file(rom_history_t *hist, const char *path)
    char buf[3][PATH_MAX];
    struct rom_history_entry *entry = NULL;
    char *last = NULL;
+   unsigned i;
 
-   for (hist->size = 0; hist->size < hist->cap; hist->size++)
+   for (hist->size = 0; hist->size < hist->cap; )
    {
-      for (unsigned i = 0; i < 3; i++)
+      for (i = 0; i < 3; i++)
       {
          *buf[i] = '\0';
          if (!fgets(buf[i], sizeof(buf[i]), file))
@@ -162,13 +174,13 @@ static bool rom_history_read_file(rom_history_t *hist, const char *path)
       entry = &hist->entries[hist->size];
 
       if (!*buf[1] || !*buf[2])
-         goto end;
-
+         continue;
 
       if (*buf[0])
          entry->path = strdup(buf[0]);
       entry->core_path = strdup(buf[1]);
       entry->core_name = strdup(buf[2]);
+      hist->size++;
    }
 
 end:

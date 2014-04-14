@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -26,8 +26,7 @@ static bool xfonts_init_font(void *data, const char *font_path, unsigned font_si
 {
    (void)font_path;
    (void)font_size;
-
-   xdk_d3d_video_t *d3d = (xdk_d3d_video_t*)data;
+   (void)data;
 
    XFONT_OpenDefaultFont(&debug_font);
    debug_font->SetBkMode(XFONT_TRANSPARENT);
@@ -45,7 +44,7 @@ static void xfonts_deinit_font(void *data)
 
 static void xfonts_render_msg(void *data, const char *msg, void *parms)
 {
-   xdk_d3d_video_t *d3d = (xdk_d3d_video_t*)data;
+   d3d_video_t *d3d = (d3d_video_t*)data;
    font_params_t *params = (font_params_t*)parms;
    wchar_t str[PATH_MAX];
    float x, y;
@@ -61,7 +60,7 @@ static void xfonts_render_msg(void *data, const char *msg, void *parms)
       y = g_settings.video.msg_pos_y;
    }
 
-   d3d->d3d_render_device->GetBackBuffer(-1, D3DBACKBUFFER_TYPE_MONO, &pFrontBuffer);
+   d3d->dev->GetBackBuffer(-1, D3DBACKBUFFER_TYPE_MONO, &pFrontBuffer);
 
    mbstowcs(str, msg, sizeof(str) / sizeof(wchar_t));
    debug_font->TextOut(pFrontBuffer, str, (unsigned)-1, x, y);

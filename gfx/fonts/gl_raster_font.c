@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -18,8 +18,12 @@
 #include "../gl_common.h"
 #include "../shader_common.h"
 
-static bool gl_init_font(void *data, const char *font_path, float font_size)
+static bool gl_init_font(void *data, const char *font_path, float font_size, unsigned win_width, unsigned win_height)
 {
+   size_t i, j;
+   (void)win_width;
+   (void)win_height;
+
    if (!g_settings.video.font_enable)
       return false;
 
@@ -35,6 +39,7 @@ static bool gl_init_font(void *data, const char *font_path, float font_size)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glBindTexture(GL_TEXTURE_2D, gl->texture[gl->tex_index]);
+      glGetIntegerv(GL_MAX_TEXTURE_SIZE, &gl->max_font_size);
    }
    else
    {
@@ -42,7 +47,7 @@ static bool gl_init_font(void *data, const char *font_path, float font_size)
       return false;
    }
 
-   for (unsigned i = 0; i < 4; i++)
+   for (i = 0; i < 4; i++)
    {
       gl->font_color[4 * i + 0] = g_settings.video.msg_color_r;
       gl->font_color[4 * i + 1] = g_settings.video.msg_color_g;
@@ -50,9 +55,9 @@ static bool gl_init_font(void *data, const char *font_path, float font_size)
       gl->font_color[4 * i + 3] = 1.0;
    }
 
-   for (unsigned i = 0; i < 4; i++)
+   for (i = 0; i < 4; i++)
    {
-      for (unsigned j = 0; j < 3; j++)
+      for (j = 0; j < 3; j++)
          gl->font_color_dark[4 * i + j] = 0.3 * gl->font_color[4 * i + j];
       gl->font_color_dark[4 * i + 3] = 1.0;
    }
@@ -124,21 +129,27 @@ static void adjust_power_of_two(gl_t *gl, struct font_rect *geom)
    geom->pot_width  = next_pow2(geom->width);
    geom->pot_height = next_pow2(geom->height);
 
+   if (geom->pot_width > gl->max_font_size)
+      geom->pot_width = gl->max_font_size;
+   if (geom->pot_height > gl->max_font_size)
+      geom->pot_height = gl->max_font_size;
+
    if ((geom->pot_width > gl->font_tex_w) || (geom->pot_height > gl->font_tex_h))
    {
-      gl->font_tex_buf = (uint16_t*)realloc(gl->font_tex_buf,
-            geom->pot_width * geom->pot_height * sizeof(uint16_t));
+      gl->font_tex_buf = (uint32_t*)realloc(gl->font_tex_buf,
+            geom->pot_width * geom->pot_height * sizeof(uint32_t));
 
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, geom->pot_width, geom->pot_height,
-            0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, NULL);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, geom->pot_width, geom->pot_height,
+            0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
       gl->font_tex_w = geom->pot_width;
       gl->font_tex_h = geom->pot_height;
    }
 }
 
-static void copy_glyph(const struct font_output *head, const struct font_rect *geom, uint16_t *buffer, unsigned width, unsigned height)
+static void copy_glyph(const struct font_output *head, const struct font_rect *geom, uint32_t *buffer, unsigned width, unsigned height)
 {
+   int h, w;
    // head has top-left oriented coords.
    int x = head->off_x - geom->x;
    int y = head->off_y - geom->y;
@@ -166,18 +177,25 @@ static void copy_glyph(const struct font_output *head, const struct font_rect *g
    if (y + font_height > (int)height)
       font_height = height - y;
 
-   uint16_t *dst = buffer + y * width + x;
-
-   for (int h = 0; h < font_height; h++, dst += width, src += head->pitch)
-      for (int w = 0; w < font_width; w++)
-         dst[w] = 0xff | (src[w] << 8); // Assume little endian for now.
+   uint32_t *dst = buffer + y * width + x;
+   for (h = 0; h < font_height; h++, dst += width, src += head->pitch)
+   {
+      uint8_t *d = (uint8_t*)dst;
+      for (w = 0; w < font_width; w++)
+      {
+         *d++ = 0xff;
+         *d++ = 0xff;
+         *d++ = 0xff;
+         *d++ = src[w];
+      }
+   }
 }
 
 // Old style "blitting", so we can render all the fonts in one go.
 // TODO: Is it possible that fonts could overlap if we blit without alpha blending?
 static void blit_fonts(gl_t *gl, const struct font_output *head, const struct font_rect *geom)
 {
-   memset(gl->font_tex_buf, 0, gl->font_tex_w * gl->font_tex_h * sizeof(uint16_t));
+   memset(gl->font_tex_buf, 0, gl->font_tex_w * gl->font_tex_h * sizeof(uint32_t));
 
    while (head)
    {
@@ -188,12 +206,13 @@ static void blit_fonts(gl_t *gl, const struct font_output *head, const struct fo
    glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
    glTexSubImage2D(GL_TEXTURE_2D,
       0, 0, 0, gl->font_tex_w, gl->font_tex_h,
-      GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, gl->font_tex_buf);
+      GL_RGBA, GL_UNSIGNED_BYTE, gl->font_tex_buf);
 }
 
 static void calculate_font_coords(gl_t *gl,
       GLfloat font_vertex[8], GLfloat font_vertex_dark[8], GLfloat font_tex_coords[8], GLfloat scale, GLfloat pos_x, GLfloat pos_y)
 {
+   unsigned i;
    GLfloat scale_factor = scale;
 
    GLfloat lx = pos_x;
@@ -212,7 +231,7 @@ static void calculate_font_coords(gl_t *gl,
 
    GLfloat shift_x = 2.0f / gl->vp.width;
    GLfloat shift_y = 2.0f / gl->vp.height;
-   for (unsigned i = 0; i < 4; i++)
+   for (i = 0; i < 4; i++)
    {
       font_vertex_dark[2 * i + 0] = font_vertex[2 * i + 0] - shift_x;
       font_vertex_dark[2 * i + 1] = font_vertex[2 * i + 1] - shift_y;
@@ -233,9 +252,6 @@ static void calculate_font_coords(gl_t *gl,
    font_tex_coords[7] = hy;
 }
 
-extern const GLfloat vertexes_flipped[];
-extern const GLfloat white_color[];
-
 static void setup_font(void *data, const char *msg, GLfloat scale, GLfloat pos_x, GLfloat pos_y)
 {
    gl_t *gl = (gl_t*)data;
@@ -243,7 +259,7 @@ static void setup_font(void *data, const char *msg, GLfloat scale, GLfloat pos_x
       return;
 
    if (gl->shader)
-      gl->shader->use(GL_SHADER_STOCK_BLEND);
+      gl->shader->use(gl, GL_SHADER_STOCK_BLEND);
 
    gl_set_viewport(gl, gl->win_width, gl->win_height, false, false);
 
@@ -290,9 +306,9 @@ static void setup_font(void *data, const char *msg, GLfloat scale, GLfloat pos_x
    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
    // Post - Go back to old rendering path.
-   gl->coords.vertex    = vertexes_flipped;
+   gl->coords.vertex    = gl->vertex_ptr;
    gl->coords.tex_coord = gl->tex_coords;
-   gl->coords.color     = white_color;
+   gl->coords.color     = gl->white_color_ptr;
    glBindTexture(GL_TEXTURE_2D, gl->texture[gl->tex_index]);
 
    glDisable(GL_BLEND);

@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -28,11 +28,8 @@
 void sha256_hash(char *out, const uint8_t *in, size_t size);
 
 #ifdef HAVE_ZLIB
-#ifdef WANT_MINIZ
-#include "deps/miniz/zlib.h"
-#else
 #include <zlib.h>
-#endif
+
 static inline uint32_t crc32_calculate(const uint8_t *data, size_t length)
 {
    return crc32(0, data, length);

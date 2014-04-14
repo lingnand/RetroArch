@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -228,12 +228,49 @@ static void add_sub_conf(config_file_t *conf, char *line)
    free(path);
 }
 
+static char *strip_comment(char *str)
+{
+   // Remove everything after comment. Keep #s inside string literals.
+   char *strend = str + strlen(str);
+   bool cut_comment = true;
+
+   while (*str)
+   {
+      char *literal = strchr(str, '\"');
+      if (!literal)
+         literal = strend;
+      char *comment = strchr(str, '#');
+      if (!comment)
+         comment = strend;
+
+      if (cut_comment && literal < comment)
+      {
+         cut_comment = false;
+         str = literal + 1;
+      }
+      else if (!cut_comment && literal)
+      {
+         cut_comment = true;
+         str = literal + 1;
+      }
+      else if (comment)
+      {
+         *comment = '\0';
+         str = comment;
+      }
+      else
+         str = strend;
+   }
+
+   return str;
+}
+
 static bool parse_line(config_file_t *conf, struct config_entry_list *list, char *line)
 {
-   // Remove everything after comment.
-   char *comment = strchr(line, '#');
-   if (comment)
-      *comment = '\0';
+   if (!*line)
+      return false;
+
+   char *comment = strip_comment(line);
 
    // Starting line with # and include includes config files. :)
    if ((comment == line) && (conf->include_depth < MAX_INCLUDE_DEPTH))
@@ -351,6 +388,55 @@ static config_file_t *config_file_new_internal(const char *path, unsigned depth)
          free(list);
    }
    fclose(file);
+
+   return conf;
+}
+
+config_file_t *config_file_new_from_string(const char *from_string)
+{
+   size_t i;
+   struct config_file *conf = (struct config_file*)calloc(1, sizeof(*conf));
+   if (!conf)
+      return NULL;
+
+   if (!from_string)
+      return conf;
+
+   conf->path = NULL;
+   conf->include_depth = 0;
+   
+   struct string_list *lines = string_split(from_string, "\n");
+   if (!lines)
+      return conf;
+
+   for (i = 0; i < lines->size; i++)
+   {
+      struct config_entry_list *list = (struct config_entry_list*)calloc(1, sizeof(*list));
+      
+      char* line = lines->elems[i].data;
+    
+      if (line)
+      {
+         if (parse_line(conf, list, line))
+         {
+            if (conf->entries)
+            {
+               conf->tail->next = list;
+               conf->tail = list;
+            }
+            else
+            {
+               conf->entries = list;
+               conf->tail = list;
+            }
+         }
+      }
+
+      if (list != conf->tail)
+         free(list);
+   }
+   
+   string_list_free(lines);
 
    return conf;
 }
@@ -572,45 +658,8 @@ bool config_get_path(config_file_t *conf, const char *key, char *buf, size_t siz
    {
       if (strcmp(key, list->key) == 0)
       {
-         const char *value = list->value;
-
-         if (*value == '~')
-         {
-            const char *home = getenv("HOME");
-            if (home)
-            {
-               size_t src_size = strlcpy(buf, home, size);
-               if (src_size >= size)
-                  return false;
-
-               buf  += src_size;
-               size -= src_size;
-               value++;
-            }
-         }
-         else if ((*value == ':') &&
-#ifdef _WIN32
-               ((value[1] == '/') || (value[1] == '\\')))
-#else
-               (value[1] == '/'))
-#endif
-         {
-            char application_dir[PATH_MAX];
-            fill_pathname_application_path(application_dir, sizeof(application_dir));
-
-            RARCH_LOG("[Config]: Querying application path: %s.\n", application_dir);
-            path_basedir(application_dir);
-
-            size_t src_size = strlcpy(buf, application_dir, size);
-            if (src_size >= size)
-               return false;
-
-            buf  += src_size;
-            size -= src_size;
-            value += 2;
-         }
-
-         return strlcpy(buf, value, size) < size;
+         fill_pathname_expand_special(buf, list->value, size);
+         return true;
       }
       list = list->next;
    }
@@ -669,6 +718,17 @@ void config_set_string(config_file_t *conf, const char *key, const char *val)
       last->next = elem;
    else
       conf->entries = elem;
+}
+
+void config_set_path(config_file_t *conf, const char *entry, const char *val)
+{
+#if defined(RARCH_CONSOLE)
+   config_set_string(conf, entry, val);
+#else
+   char buf[PATH_MAX];
+   fill_pathname_abbreviate_special(buf, val, sizeof(buf));
+   config_set_string(conf, entry, buf);
+#endif
 }
 
 void config_set_double(config_file_t *conf, const char *key, double val)

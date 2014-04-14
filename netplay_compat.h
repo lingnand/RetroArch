@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -31,6 +31,7 @@
 #elif defined(_XBOX)
 #define NOD3D
 #include <xtl.h>
+#include <io.h>
 #else
 #include <sys/select.h>
 #include <sys/types.h>
@@ -57,7 +58,9 @@
 
 #if defined(_WIN32)
 // Woohoo, Winsock has headers from the STONE AGE. :D
+#ifndef _XBOX360
 #define close(x) closesocket(x)
+#endif
 #define CONST_CAST (const char*)
 #define NONCONST_CAST (char*)
 #else

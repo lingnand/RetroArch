@@ -9,7 +9,7 @@
 #include <screen/screen.h>
 #include <sys/neutrino.h>
 #include "ButtonMap.h"
-#include "../../../core_info.h"
+#include "../../../frontend/info/core_info.h"
 
 using namespace bb::cascades;
 
@@ -37,7 +37,6 @@ public:
     Q_INVOKABLE void findDevices();
     Q_INVOKABLE void discoverController(int player);
     Q_INVOKABLE void updateOptions(QString property, QString selected);
-    Q_INVOKABLE void OrientationHack();
     void populateCores(core_info_list_t * info);
 
 signals:
@@ -50,13 +49,14 @@ public slots:
 	void onRotationCompleted();
 	void onCoreSelected(QVariant);
 
-
 private:
     /**
      * This QThread-run function runs the custom window rendering in a separate thread to avoid lag
      * in the rest of the Cascades UI.
      */
     void run();
+
+    void recurseAddDir(QDir d, QStringList & list);
 
     QString rom;
     QString getRom();
@@ -69,10 +69,10 @@ private:
 	QString romExtensions;
 	QString getRomExtensions();
 
-	void initRASettings();
-
 	void doSettings();
+	void setOrientation();
 
+	void initRASettings();
 
 	int chid, coid;
 	int state;

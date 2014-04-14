@@ -1,5 +1,5 @@
 /*  RSound - A PCM audio client/server
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RSound is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef FIFO_BUF_TYPEDEF
 #define FIFO_BUF_TYPEDEF
 typedef struct fifo_buffer fifo_buffer_t;
@@ -32,4 +36,9 @@ void fifo_free(fifo_buffer_t *buffer);
 size_t fifo_read_avail(fifo_buffer_t *buffer);
 size_t fifo_write_avail(fifo_buffer_t *buffer);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif
+

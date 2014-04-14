@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -37,8 +37,19 @@ static bool g_has_focus;
 static bool g_true_full;
 static unsigned g_screen;
 
+static XIM g_xim;
+static XIC g_xic;
+
 static GLXContext g_ctx;
 static GLXFBConfig g_fbc;
+static unsigned g_major;
+static unsigned g_minor;
+static bool g_core;
+static bool g_debug;
+
+typedef GLXContext (*glXCreateContextAttribsARBProc)(Display*,
+      GLXFBConfig, GLXContext, Bool, const int*);
+static glXCreateContextAttribsARBProc glx_create_context_attribs;
 
 static XF86VidModeModeInfo g_desktop_mode;
 static bool g_should_reset_mode;
@@ -49,6 +60,7 @@ static unsigned g_interval;
 static bool g_is_double;
 
 static int (*g_pglSwapInterval)(int);
+static void (*g_pglSwapIntervalEXT)(Display*, GLXDrawable, int);
 
 static void sighandler(int sig)
 {
@@ -70,13 +82,20 @@ static int nul_handler(Display *dpy, XErrorEvent *event)
    return 0;
 }
 
-static void gfx_ctx_get_video_size(unsigned *width, unsigned *height);
-static void gfx_ctx_destroy(void);
+static void gfx_ctx_get_video_size(void *data, unsigned *width, unsigned *height);
+static void gfx_ctx_destroy(void *data);
 
-static void gfx_ctx_swap_interval(unsigned interval)
+static void gfx_ctx_swap_interval(void *data, unsigned interval)
 {
+   (void)data;
    g_interval = interval;
-   if (g_pglSwapInterval)
+
+   if (g_pglSwapIntervalEXT)
+   {
+      RARCH_LOG("[GLX]: glXSwapIntervalEXT(%u)\n", g_interval);
+      g_pglSwapIntervalEXT(g_dpy, g_glx_win, g_interval);
+   }
+   else if (g_pglSwapInterval)
    {
       RARCH_LOG("[GLX]: glXSwapInterval(%u)\n", g_interval);
       if (g_pglSwapInterval(g_interval) != 0)
@@ -84,13 +103,13 @@ static void gfx_ctx_swap_interval(unsigned interval)
    }
 }
 
-static void gfx_ctx_check_window(bool *quit,
+static void gfx_ctx_check_window(void *data, bool *quit,
       bool *resize, unsigned *width, unsigned *height, unsigned frame_count)
 {
    (void)frame_count;
 
    unsigned new_width = *width, new_height = *height;
-   gfx_ctx_get_video_size(&new_width, &new_height);
+   gfx_ctx_get_video_size(data, &new_width, &new_height);
 
    if (new_width != *width || new_height != *height)
    {
@@ -103,28 +122,34 @@ static void gfx_ctx_check_window(bool *quit,
    while (XPending(g_dpy))
    {
       XNextEvent(g_dpy, &event);
+      bool filter = XFilterEvent(&event, g_win);
+
       switch (event.type)
       {
          case ClientMessage:
-            if ((Atom)event.xclient.data.l[0] == g_quit_atom)
+            if (event.xclient.window == g_win &&
+                  (Atom)event.xclient.data.l[0] == g_quit_atom)
                g_quit = true;
             break;
 
          case DestroyNotify:
-            g_quit = true;
+            if (event.xdestroywindow.window == g_win)
+               g_quit = true;
             break;
 
          case MapNotify:
-            g_has_focus = true;
+            if (event.xmap.window == g_win)
+               g_has_focus = true;
             break;
 
          case UnmapNotify:
-            g_has_focus = false;
+            if (event.xunmap.window == g_win)
+               g_has_focus = false;
             break;
 
          case KeyPress:
          case KeyRelease:
-            x11_handle_key_event(&event);
+            x11_handle_key_event(&event, g_xic, filter);
             break;
       }
    }
@@ -132,27 +157,36 @@ static void gfx_ctx_check_window(bool *quit,
    *quit = g_quit;
 }
 
-static void gfx_ctx_swap_buffers(void)
+static void gfx_ctx_swap_buffers(void *data)
 {
+   (void)data;
    if (g_is_double)
       glXSwapBuffers(g_dpy, g_glx_win);
 }
 
-static void gfx_ctx_set_resize(unsigned width, unsigned height)
+static void gfx_ctx_set_resize(void *data, unsigned width, unsigned height)
 {
+   (void)data;
    (void)width;
    (void)height;
 }
 
-static void gfx_ctx_update_window_title(void)
+static void gfx_ctx_update_window_title(void *data)
 {
-   char buf[128];
-   if (gfx_get_fps(buf, sizeof(buf), false))
+   (void)data;
+   char buf[128], buf_fps[128];
+   bool fps_draw = g_settings.fps_show;
+   if (gfx_get_fps(buf, sizeof(buf), fps_draw ? buf_fps : NULL, sizeof(buf_fps)))
       XStoreName(g_dpy, g_win, buf);
+
+   if (fps_draw)
+      msg_queue_push(g_extern.msg_queue, buf_fps, 1, 1);
 }
 
-static void gfx_ctx_get_video_size(unsigned *width, unsigned *height)
+static void gfx_ctx_get_video_size(void *data, unsigned *width, unsigned *height)
 {
+   (void)data;
+
    if (!g_dpy || g_win == None)
    {
       Display *dpy = XOpenDisplay(NULL);
@@ -179,7 +213,7 @@ static void gfx_ctx_get_video_size(unsigned *width, unsigned *height)
    }
 }
 
-static bool gfx_ctx_init(void)
+static bool gfx_ctx_init(void *data)
 {
    if (g_inited)
       return false;
@@ -203,14 +237,29 @@ static bool gfx_ctx_init(void)
    GLXFBConfig *fbcs = NULL;
    g_quit = 0;
 
-   g_dpy = XOpenDisplay(NULL);
+   if (!g_dpy)
+      g_dpy = XOpenDisplay(NULL);
+
    if (!g_dpy)
       goto error;
 
-   // GLX 1.3+ required.
    int major, minor;
    glXQueryVersion(g_dpy, &major, &minor);
-   if (major < 1 || (major == 1 && minor < 3))
+
+   // GLX 1.3+ minimum required.
+   if ((major * 1000 + minor) < 1003)
+      goto error;
+
+   glx_create_context_attribs = (glXCreateContextAttribsARBProc)glXGetProcAddress((const GLubyte*)"glXCreateContextAttribsARB");
+
+#ifdef GL_DEBUG
+   g_debug = true;
+#else
+   g_debug = g_extern.system.hw_render_callback.debug_context;
+#endif
+
+   g_core = (g_major * 1000 + g_minor) >= 3001; // Have to use ContextAttribs
+   if ((g_core || g_debug) && !glx_create_context_attribs)
       goto error;
 
    int nelements;
@@ -232,11 +281,11 @@ static bool gfx_ctx_init(void)
    return true;
 
 error:
-   gfx_ctx_destroy();
+   gfx_ctx_destroy(data);
    return false;
 }
 
-static bool gfx_ctx_set_video_mode(
+static bool gfx_ctx_set_video_mode(void *data,
       unsigned width, unsigned height,
       bool fullscreen)
 {
@@ -339,11 +388,45 @@ static bool gfx_ctx_set_video_mode(
    XEvent event;
    XIfEvent(g_dpy, &event, glx_wait_notify, NULL);
 
-   g_ctx = glXCreateNewContext(g_dpy, g_fbc, GLX_RGBA_TYPE, 0, True);
    if (!g_ctx)
    {
-      RARCH_ERR("[GLX]: Failed to create new context.\n");
-      goto error;
+      if (g_core || g_debug)
+      {
+         int attribs[16];
+         int *aptr = attribs;
+
+         if (g_core)
+         {
+            *aptr++ = GLX_CONTEXT_MAJOR_VERSION_ARB;
+            *aptr++ = g_major;
+            *aptr++ = GLX_CONTEXT_MINOR_VERSION_ARB;
+            *aptr++ = g_minor;
+            *aptr++ = GLX_CONTEXT_PROFILE_MASK_ARB;
+            *aptr++ = GLX_CONTEXT_CORE_PROFILE_BIT_ARB;
+         }
+
+         if (g_debug)
+         {
+            *aptr++ = GLX_CONTEXT_FLAGS_ARB;
+            *aptr++ = GLX_CONTEXT_DEBUG_BIT_ARB;
+         }
+
+         *aptr = None;
+         g_ctx = glx_create_context_attribs(g_dpy, g_fbc, NULL, True, attribs);
+      }
+      else
+         g_ctx = glXCreateNewContext(g_dpy, g_fbc, GLX_RGBA_TYPE, 0, True);
+
+      if (!g_ctx)
+      {
+         RARCH_ERR("[GLX]: Failed to create new context.\n");
+         goto error;
+      }
+   }
+   else
+   {
+      driver.video_cache_context_ack = true;
+      RARCH_LOG("[GLX]: Using cached GL context.\n");
    }
 
    glXMakeContextCurrent(g_dpy, g_glx_win, g_glx_win, g_ctx);
@@ -359,18 +442,16 @@ static bool gfx_ctx_set_video_mode(
    if (g_is_double)
    {
       const char *swap_func = NULL;
+
+      g_pglSwapIntervalEXT = (void (*)(Display*, GLXDrawable, int))glXGetProcAddress((const GLubyte*)"glXSwapIntervalEXT");
       g_pglSwapInterval = (int (*)(int))glXGetProcAddress((const GLubyte*)"glXSwapIntervalMESA");
-      if (g_pglSwapInterval)
+
+      if (g_pglSwapIntervalEXT)
+         swap_func = "glXSwapIntervalEXT";
+      else if (g_pglSwapInterval)
          swap_func = "glXSwapIntervalMESA";
 
-      if (!g_pglSwapInterval)
-      {
-         g_pglSwapInterval = (int (*)(int))glXGetProcAddress((const GLubyte*)"glXSwapIntervalSGI");
-         if (g_pglSwapInterval)
-            swap_func = "glXSwapIntervalSGI";
-      }
-
-      if (!g_pglSwapInterval)
+      if (!g_pglSwapInterval && !g_pglSwapIntervalEXT)
          RARCH_WARN("[GLX]: Cannot find swap interval call.\n");
       else
          RARCH_LOG("[GLX]: Found swap function: %s.\n", swap_func);
@@ -378,7 +459,7 @@ static bool gfx_ctx_set_video_mode(
    else
       RARCH_WARN("[GLX]: Context is not double buffered!.\n");
 
-   gfx_ctx_swap_interval(g_interval);
+   gfx_ctx_swap_interval(data, g_interval);
 
    // This can blow up on some drivers. It's not fatal, so override errors for this call.
    old_handler = XSetErrorHandler(nul_handler);
@@ -389,6 +470,9 @@ static bool gfx_ctx_set_video_mode(
    XFree(vi);
    g_has_focus = true;
    g_inited    = true;
+
+   if (!x11_create_input_context(g_dpy, g_win, &g_xim, &g_xic))
+      goto error;
 
    driver.display_type  = RARCH_DISPLAY_X11;
    driver.video_display = (uintptr_t)g_dpy;
@@ -401,17 +485,24 @@ error:
    if (vi)
       XFree(vi);
 
-   gfx_ctx_destroy();
+   gfx_ctx_destroy(data);
    return false;
 }
 
-static void gfx_ctx_destroy(void)
+static void gfx_ctx_destroy(void *data)
 {
+   (void)data;
+   x11_destroy_input_context(&g_xim, &g_xic);
+
    if (g_dpy && g_ctx)
    {
+      glFinish();
       glXMakeContextCurrent(g_dpy, None, None, NULL);
-      glXDestroyContext(g_dpy, g_ctx);
-      g_ctx = NULL;
+      if (!driver.video_cache_context)
+      {
+         glXDestroyContext(g_dpy, g_ctx);
+         g_ctx = NULL;
+      }
    }
 
    if (g_win)
@@ -452,7 +543,7 @@ static void gfx_ctx_destroy(void)
       g_should_reset_mode = false;
    }
 
-   if (g_dpy)
+   if (!driver.video_cache_context && g_dpy)
    {
       XCloseDisplay(g_dpy);
       g_dpy = NULL;
@@ -460,17 +551,22 @@ static void gfx_ctx_destroy(void)
 
    g_inited = false;
    g_pglSwapInterval = NULL;
+   g_pglSwapIntervalEXT = NULL;
+   g_major = g_minor = 0;
+   g_core = false;
 }
 
-static void gfx_ctx_input_driver(const input_driver_t **input, void **input_data)
+static void gfx_ctx_input_driver(void *data, const input_driver_t **input, void **input_data)
 {
+   (void)data;
    void *xinput = input_x.init();
    *input       = xinput ? &input_x : NULL;
    *input_data  = xinput;
 }
 
-static bool gfx_ctx_has_focus(void)
+static bool gfx_ctx_has_focus(void *data)
 {
+   (void)data;
    if (!g_inited)
       return false;
 
@@ -486,25 +582,17 @@ static gfx_ctx_proc_t gfx_ctx_get_proc_address(const char *symbol)
    return glXGetProcAddress((const GLubyte*)symbol);
 }
 
-static bool gfx_ctx_bind_api(enum gfx_ctx_api api)
+static bool gfx_ctx_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
+   (void)data;
+   g_major = major;
+   g_minor = minor;
    return api == GFX_CTX_OPENGL_API;
 }
 
-#ifdef HAVE_EGL
-static bool gfx_ctx_init_egl_image_buffer(const video_info_t *video)
+static void gfx_ctx_show_mouse(void *data, bool state)
 {
-   return false;
-}
-
-static bool gfx_ctx_write_egl_image(const void *frame, unsigned width, unsigned height, unsigned pitch, bool rgb32, unsigned index, void **image_handle)
-{
-   return false;
-}
-#endif
-
-static void gfx_ctx_show_mouse(bool state)
-{
+   (void)data;
    x11_show_mouse(g_dpy, g_win, state);
 }
 
@@ -524,8 +612,8 @@ const gfx_ctx_driver_t gfx_ctx_glx = {
    gfx_ctx_input_driver,
    gfx_ctx_get_proc_address,
 #ifdef HAVE_EGL
-   gfx_ctx_init_egl_image_buffer,
-   gfx_ctx_write_egl_image,
+   NULL,
+   NULL,
 #endif
    gfx_ctx_show_mouse,
    "glx",

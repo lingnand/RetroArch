@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -16,12 +16,8 @@
 
 #include "../driver.h"
 #include <stdlib.h>
-#if defined(RARCH_CONSOLE) || defined(HAVE_GRIFFIN)
-#include "../deps/librsound/rsound.h"
-#else
-#include <rsound.h>
-#endif
-#include "fifo_buffer.h"
+#include "rsound.h"
+#include "../fifo_buffer.h"
 #include "../boolean.h"
 #include "../thread.h"
 

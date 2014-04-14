@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -19,45 +19,33 @@
 #include "../gfx_common.h"
 #include "../gl_common.h"
 
-#include "../image.h"
-
-#include "../fonts/gl_font.h"
-#include <stdint.h>
-
-#ifdef HAVE_GLSL
-#include "../shader_glsl.h"
-#endif
-
-GLfloat _angle;
-
-static enum gfx_ctx_api g_api;
-
 static void gfx_ctx_set_swap_interval(unsigned interval)
 {
-   RARCH_LOG("gfx_ctx_set_swap_interval(%d).\n", interval);
+   (void)interval;
 }
 
-static void gfx_ctx_destroy(void)
+static void gfx_ctx_destroy(void *data)
 {
+   (void)data;
 }
 
-static void gfx_ctx_get_video_size(unsigned *width, unsigned *height)
-{
-}
+static void gfx_ctx_get_video_size(void *data, unsigned *width, unsigned *height)
+{}
 
 static bool gfx_ctx_init(void)
 {
-
    return true;
 }
 
-static void gfx_ctx_swap_buffers(void)
-{
-}
+static void gfx_ctx_swap_buffers(void *data)
+   // video_data can have changed here ...
+   video_data = driver.video_data;
+{}
 
-static void gfx_ctx_check_window(bool *quit,
+static void gfx_ctx_check_window(void *data, bool *quit,
       bool *resize, unsigned *width, unsigned *height, unsigned frame_count)
 {
+   (void)data;
    (void)frame_count;
 
    *quit = false;
@@ -70,28 +58,27 @@ static void gfx_ctx_check_window(bool *quit,
       *height = new_height;
       *resize = true;
    }
-
-   // Check if we are exiting.
-   if (g_extern.lifecycle_state & (1ULL << RARCH_QUIT_KEY))
-      *quit = true;
 }
 
-static void gfx_ctx_set_resize(unsigned width, unsigned height)
+static void gfx_ctx_set_resize(void *data, unsigned width, unsigned height)
 {
+   (void)data;
    (void)width;
    (void)height;
 }
 
-static void gfx_ctx_update_window_title(void)
+static void gfx_ctx_update_window_title(void *data)
 {
-   char buf[128];
-   gfx_get_fps(buf, sizeof(buf), false);
+   (void)data;
+   char buf[128], buf_fps[128];
+   gfx_get_fps(buf, sizeof(buf), buf_fps, sizeof(buf_fps));
 }
 
-static bool gfx_ctx_set_video_mode(
+static bool gfx_ctx_set_video_mode(void *data,
       unsigned width, unsigned height,
       bool fullscreen)
 {
+   (void)data;
    (void)width;
    (void)height;
    (void)fullscreen;
@@ -99,27 +86,23 @@ static bool gfx_ctx_set_video_mode(
 }
 
 
-static void gfx_ctx_input_driver(const input_driver_t **input, void **input_data)
+static void gfx_ctx_input_driver(void *data, const input_driver_t **input, void **input_data)
 {
+   (void)data;
    *input = NULL;
    *input_data = NULL;
 }
 
-static unsigned gfx_ctx_get_resolution_width(unsigned resolution_id)
+static bool gfx_ctx_bind_api(void *data, enum gfx_ctx_api api)
 {
-   int gl_width;
-
-   return gl_width;
+   (void)data;
+   (void)api;
+   return true;
 }
 
-static bool gfx_ctx_bind_api(enum gfx_ctx_api api)
+static bool gfx_ctx_has_focus(void *data)
 {
-   g_api = api;
-   return api == GFX_CTX_OPENGL_ES_API;
-}
-
-static bool gfx_ctx_has_focus(void)
-{
+   (void)data;
    return true;
 }
 

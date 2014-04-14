@@ -1,0 +1,37 @@
+## All data is optional, but helps improve user experience.
+
+# Name displayed when the user is selecting the core.
+# display_name = "NES / Famicom"
+
+# List of supported extensions.
+# supported_extensions = "nes|fds"
+
+# Name of the core.
+# corename = "Nestopia"
+
+# The developer.
+# manufacturer = "Nintendo"
+
+# Name of the system that the core targets (optional).
+# systemname = "Nintendo Entertainment System"
+
+# License of the core's sourcecode
+# license = "GPLv3"
+
+# Privacy-specific permissions needed for using the core
+# permissions = ""
+
+# Notes
+#notes = "note1|note2|note3 with spaces|note 4 with spaces|note 5 (test)|note6"
+
+# The number of mandatory/optional firmware files the core needs
+# firmware_count = 7
+
+# Firmware entries should be named from 0 
+# Firmware description 
+# firmware0_desc = "filename (Description)" ex: firmware0_desc = "bios.gg (GameGear BIOS)"
+# Firmware path
+# firmware0_path = "filename.ext"  ex: firmware0_path = "bios.gg"
+# Is firmware optional or not, if not defined RetroArch will assume it is required
+# firmware0_opt = "true/false"
+

@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -26,21 +26,6 @@
 #endif
 #endif
 
-static inline uint64_t build_argb64(uint16_t a, uint16_t r, uint16_t g, uint16_t b)
-{
-   return ((uint64_t)a << 48) | ((uint64_t)r << 32) | ((uint64_t)g << 16) | ((uint64_t)b << 0);
-}
-
-static inline uint8_t clamp_8bit(int16_t col)
-{
-   if (col > 255)
-      return 255;
-   else if (col < 0)
-      return 0;
-   else
-      return (uint8_t)col;
-}
-
 // ARGB8888 scaler is split in two:
 //
 // First, horizontal scaler is applied.
@@ -61,22 +46,22 @@ static inline uint8_t clamp_8bit(int16_t col)
 #if defined(__SSE2__)
 void scaler_argb8888_vert(const struct scaler_ctx *ctx, void *output_, int stride)
 {
+   int h, w, y;
    const uint64_t *input = ctx->scaled.frame;
    uint32_t *output = (uint32_t*)output_;
 
    const int16_t *filter_vert = ctx->vert.filter;
 
-   for (int h = 0; h < ctx->out_height; h++, filter_vert += ctx->vert.filter_stride, output += stride >> 2)
+   for (h = 0; h < ctx->out_height; h++, filter_vert += ctx->vert.filter_stride, output += stride >> 2)
    {
       const uint64_t *input_base = input + ctx->vert.filter_pos[h] * (ctx->scaled.stride >> 3);
 
-      for (int w = 0; w < ctx->out_width; w++)
+      for (w = 0; w < ctx->out_width; w++)
       {
          __m128i res = _mm_setzero_si128();
 
          const uint64_t *input_base_y = input_base + w;
 
-         size_t y;
          for (y = 0; (y + 1) < ctx->vert.filter_len; y += 2, input_base_y += (ctx->scaled.stride >> 2))
          {
             __m128i coeff = _mm_set_epi64x(filter_vert[y + 1] * 0x0001000100010001ll, filter_vert[y + 0] * 0x0001000100010001ll);
@@ -105,16 +90,17 @@ void scaler_argb8888_vert(const struct scaler_ctx *ctx, void *output_, int strid
 #else
 void scaler_argb8888_vert(const struct scaler_ctx *ctx, void *output_, int stride)
 {
+   int h, w, y;
    const uint64_t *input = ctx->scaled.frame;
    uint32_t *output = (uint32_t*)output_;
 
    const int16_t *filter_vert = ctx->vert.filter;
 
-   for (int h = 0; h < ctx->out_height; h++, filter_vert += ctx->vert.filter_stride, output += stride >> 2)
+   for (h = 0; h < ctx->out_height; h++, filter_vert += ctx->vert.filter_stride, output += stride >> 2)
    {
       const uint64_t *input_base = input + ctx->vert.filter_pos[h] * (ctx->scaled.stride >> 3);
 
-      for (int w = 0; w < ctx->out_width; w++)
+      for (w = 0; w < ctx->out_width; w++)
       {
          int16_t res_a = 0;
          int16_t res_r = 0;
@@ -122,7 +108,7 @@ void scaler_argb8888_vert(const struct scaler_ctx *ctx, void *output_, int strid
          int16_t res_b = 0;
 
          const uint64_t *input_base_y = input_base + w;
-         for (size_t y = 0; y < ctx->vert.filter_len; y++, input_base_y += (ctx->scaled.stride >> 3))
+         for (y = 0; y < ctx->vert.filter_len; y++, input_base_y += (ctx->scaled.stride >> 3))
          {
             uint64_t col = *input_base_y;
 
@@ -153,20 +139,20 @@ void scaler_argb8888_vert(const struct scaler_ctx *ctx, void *output_, int strid
 #if defined(__SSE2__)
 void scaler_argb8888_horiz(const struct scaler_ctx *ctx, const void *input_, int stride)
 {
+   int h, w, x;
    const uint32_t *input = (const uint32_t*)input_;
    uint64_t *output      = ctx->scaled.frame;
 
-   for (int h = 0; h < ctx->scaled.height; h++, input += stride >> 2, output += ctx->scaled.stride >> 3)
+   for (h = 0; h < ctx->scaled.height; h++, input += stride >> 2, output += ctx->scaled.stride >> 3)
    {
       const int16_t *filter_horiz = ctx->horiz.filter;
 
-      for (int w = 0; w < ctx->scaled.width; w++, filter_horiz += ctx->horiz.filter_stride)
+      for (w = 0; w < ctx->scaled.width; w++, filter_horiz += ctx->horiz.filter_stride)
       {
          __m128i res = _mm_setzero_si128();
 
          const uint32_t *input_base_x = input + ctx->horiz.filter_pos[w];
 
-         size_t x;
          for (x = 0; (x + 1) < ctx->horiz.filter_len; x += 2)
          {
             __m128i coeff = _mm_set_epi64x(filter_horiz[x + 1] * 0x0001000100010001ll, filter_horiz[x + 0] * 0x0001000100010001ll);
@@ -205,16 +191,22 @@ void scaler_argb8888_horiz(const struct scaler_ctx *ctx, const void *input_, int
    }
 }
 #else
+static inline uint64_t build_argb64(uint16_t a, uint16_t r, uint16_t g, uint16_t b)
+{
+   return ((uint64_t)a << 48) | ((uint64_t)r << 32) | ((uint64_t)g << 16) | ((uint64_t)b << 0);
+}
+
 void scaler_argb8888_horiz(const struct scaler_ctx *ctx, const void *input_, int stride)
 {
+   int h, w, x;
    const uint32_t *input = (uint32_t*)input_;
    uint64_t *output      = ctx->scaled.frame;
 
-   for (int h = 0; h < ctx->scaled.height; h++, input += stride >> 2, output += ctx->scaled.stride >> 3)
+   for (h = 0; h < ctx->scaled.height; h++, input += stride >> 2, output += ctx->scaled.stride >> 3)
    {
       const int16_t *filter_horiz = ctx->horiz.filter;
 
-      for (int w = 0; w < ctx->scaled.width; w++, filter_horiz += ctx->horiz.filter_stride)
+      for (w = 0; w < ctx->scaled.width; w++, filter_horiz += ctx->horiz.filter_stride)
       {
          const uint32_t *input_base_x = input + ctx->horiz.filter_pos[w];
 
@@ -223,7 +215,7 @@ void scaler_argb8888_horiz(const struct scaler_ctx *ctx, const void *input_, int
          int16_t res_g = 0;
          int16_t res_b = 0;
 
-         for (size_t x = 0; x < ctx->horiz.filter_len; x++)
+         for (x = 0; x < ctx->horiz.filter_len; x++)
          {
             uint32_t col = input_base_x[x];
 
@@ -252,6 +244,7 @@ void scaler_argb8888_point_special(const struct scaler_ctx *ctx,
       int in_width, int in_height,
       int out_stride, int in_stride)
 {
+   int h, w;
    (void)ctx;
    int x_pos  = (1 << 15) * in_width / out_width - (1 << 15);
    int x_step = (1 << 16) * in_width / out_width;
@@ -266,12 +259,12 @@ void scaler_argb8888_point_special(const struct scaler_ctx *ctx,
    const uint32_t *input = (const uint32_t*)input_;
    uint32_t *output = (uint32_t*)output_;
 
-   for (int h = 0; h < out_height; h++, y_pos += y_step, output += out_stride >> 2)
+   for (h = 0; h < out_height; h++, y_pos += y_step, output += out_stride >> 2)
    {
       int x = x_pos;
       const uint32_t *inp = input + (y_pos >> 16) * (in_stride >> 2);
 
-      for (int w = 0; w < out_width; w++, x += x_step)
+      for (w = 0; w < out_width; w++, x += x_step)
          output[w] = inp[x >> 16];
    }
 }

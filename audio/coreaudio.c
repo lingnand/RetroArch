@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Chris Moeller
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Chris Moeller
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -22,6 +22,12 @@
 #include "../boolean.h"
 #include <pthread.h>
 
+#ifdef OSX
+#include <CoreAudio/CoreAudio.h>
+#else
+#include <AudioToolbox/AudioToolbox.h>
+#endif
+
 #include <CoreAudio/CoreAudioTypes.h>
 #include <AudioUnit/AudioUnit.h>
 #include <AudioUnit/AUComponent.h>
@@ -38,6 +44,8 @@ typedef struct coreaudio
    bool nonblock;
    size_t buffer_size;
 } coreaudio_t;
+
+static bool g_interrupted;
 
 static void coreaudio_free(void *data)
 {
@@ -93,6 +101,56 @@ static OSStatus audio_write_cb(void *userdata, AudioUnitRenderActionFlags *actio
    return noErr;
 }
 
+#ifdef OSX
+static void choose_output_device(coreaudio_t *dev, const char* device)
+{
+   AudioObjectPropertyAddress propaddr =
+   { 
+      kAudioHardwarePropertyDevices, 
+      kAudioObjectPropertyScopeGlobal, 
+      kAudioObjectPropertyElementMaster 
+   };
+
+   UInt32 size = 0;
+
+   if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &propaddr, 0, 0, &size) != noErr)
+      return;
+
+   UInt32 deviceCount = size / sizeof(AudioDeviceID);
+   AudioDeviceID *devices = malloc(size);
+
+   if (!devices || AudioObjectGetPropertyData(kAudioObjectSystemObject, &propaddr, 0, 0, &size, devices) != noErr)
+      goto done;
+
+   propaddr.mScope = kAudioDevicePropertyScopeOutput;
+   propaddr.mSelector = kAudioDevicePropertyDeviceName;
+   size = 1024;
+
+   for (unsigned i = 0; i < deviceCount; i ++)
+   {
+      char device_name[1024];
+      device_name[0] = 0;
+
+      if (AudioObjectGetPropertyData(devices[i], &propaddr, 0, 0, &size, device_name) == noErr && strcmp(device_name, device) == 0)
+      {
+         AudioUnitSetProperty(dev->dev, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &devices[i], sizeof(AudioDeviceID));
+         goto done;
+      }
+   }
+
+done:
+   free(devices);
+}
+#endif
+
+#ifdef IOS
+static void coreaudio_interrupt_listener(void *data, UInt32 interrupt_state)
+{
+   (void)data;
+   g_interrupted = (interrupt_state == kAudioSessionBeginInterruption);
+}
+#endif
+
 static void *coreaudio_init(const char *device, unsigned rate, unsigned latency)
 {
    (void)device;
@@ -103,6 +161,16 @@ static void *coreaudio_init(const char *device, unsigned rate, unsigned latency)
 
    pthread_mutex_init(&dev->lock, NULL);
    pthread_cond_init(&dev->cond, NULL);
+
+#ifdef IOS
+   static bool session_initialized = false;
+   if (!session_initialized)
+   {
+      session_initialized = true;
+      AudioSessionInitialize(0, 0, coreaudio_interrupt_listener, 0);
+      AudioSessionSetActive(true);
+   }
+#endif
 
    // Create AudioComponent
    AudioComponentDescription desc = {0};
@@ -120,6 +188,11 @@ static void *coreaudio_init(const char *device, unsigned rate, unsigned latency)
    
    if (AudioComponentInstanceNew(comp, &dev->dev) != noErr)
       goto error;
+
+#ifdef OSX
+   if (device)
+      choose_output_device(dev, device);
+#endif
 
    dev->dev_alive = true;
 
@@ -210,7 +283,17 @@ static ssize_t coreaudio_write(void *data, const void *buf_, size_t size)
    const uint8_t *buf = (const uint8_t*)buf_;
    size_t written = 0;
 
-   while (size > 0)
+#ifdef IOS
+   struct timeval time;
+   gettimeofday(&time, 0);
+   
+   struct timespec timeout;
+   memset(&timeout, 0, sizeof(timeout));
+   timeout.tv_sec = time.tv_sec + 3;
+   timeout.tv_nsec = time.tv_usec * 1000;
+#endif
+
+   while (!g_interrupted && size > 0)
    {
       pthread_mutex_lock(&dev->lock);
 
@@ -229,8 +312,13 @@ static ssize_t coreaudio_write(void *data, const void *buf_, size_t size)
          break;
       }
 
+#ifdef IOS
+      if (write_avail == 0 && pthread_cond_timedwait(&dev->cond, &dev->lock, &timeout) == ETIMEDOUT)
+         g_interrupted = true;
+#else
       if (write_avail == 0)
          pthread_cond_wait(&dev->cond, &dev->lock);
+#endif
       pthread_mutex_unlock(&dev->lock);
    }
 

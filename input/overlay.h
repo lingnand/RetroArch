@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -17,6 +17,7 @@
 #define INPUT_OVERLAY_H__
 
 #include "../boolean.h"
+#include "../libretro.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -30,6 +31,17 @@ extern "C" {
 // This interface requires that the video driver has support for the overlay interface.
 typedef struct input_overlay input_overlay_t;
 
+typedef struct input_overlay_state
+{
+   uint64_t buttons;   // This is a bitmask of (1 << key_bind_id).
+   int16_t analog[4];  // Left X, Left Y, Right X, Right Y
+   uint32_t keys[RETROK_LAST / 32 + 1];
+} input_overlay_state_t;
+
+#define OVERLAY_GET_KEY(state, key) (((state)->keys[(key) / 32] >> ((key) % 32)) & 1)
+#define OVERLAY_SET_KEY(state, key) (state)->keys[(key) / 32] |= 1 << ((key) % 32)
+#define OVERLAY_CLEAR_KEY(state, key) (state)->keys[(key) / 32] &= ~(1 << ((key) % 32))
+
 input_overlay_t *input_overlay_new(const char *overlay);
 void input_overlay_free(input_overlay_t *ol);
 
@@ -38,8 +50,10 @@ void input_overlay_enable(input_overlay_t *ol, bool enable);
 bool input_overlay_full_screen(input_overlay_t *ol);
 
 // norm_x and norm_y are the result of input_translate_coord_viewport().
-// Resulting state is a bitmask of (1 << key_bind_id).
-uint64_t input_overlay_poll(input_overlay_t *ol, int16_t norm_x, int16_t norm_y);
+void input_overlay_poll(input_overlay_t *ol, input_overlay_state_t *out, int16_t norm_x, int16_t norm_y);
+
+// called after all the input_overlay_poll calls to update the range modifiers for pressed/unpressed regions and alpha mods
+void input_overlay_post_poll(input_overlay_t *ol);
 
 // Call when there is nothing to poll. Allows overlay to clear certain state.
 void input_overlay_poll_clear(input_overlay_t *ol);

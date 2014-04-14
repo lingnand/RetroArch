@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -36,11 +36,19 @@ static const frontend_ctx_driver_t *frontend_ctx_drivers[] = {
 #if defined(IOS) || defined(OSX)
    &frontend_ctx_apple,
 #endif
+#if defined(ANDROID)
+   &frontend_ctx_android,
+#endif
+#if defined(PSP)
+   &frontend_ctx_psp,
+#endif
+   NULL // zero length array is not valid
 };
 
 const frontend_ctx_driver_t *frontend_ctx_find_driver(const char *ident)
 {
-   for (unsigned i = 0; i < sizeof(frontend_ctx_drivers) / sizeof(frontend_ctx_drivers[0]); i++)
+   unsigned i;
+   for (i = 0; frontend_ctx_drivers[i]; i++)
    {
       if (strcmp(frontend_ctx_drivers[i]->ident, ident) == 0)
          return frontend_ctx_drivers[i];
@@ -51,7 +59,8 @@ const frontend_ctx_driver_t *frontend_ctx_find_driver(const char *ident)
 
 const frontend_ctx_driver_t *frontend_ctx_init_first(void)
 {
-   for (unsigned i = 0; i < sizeof(frontend_ctx_drivers) / sizeof(frontend_ctx_drivers[0]); i++)
+   unsigned i;
+   for (i = 0; frontend_ctx_drivers[i]; i++)
       return frontend_ctx_drivers[i];
 
    return NULL;

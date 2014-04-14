@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -15,6 +15,10 @@
 
 #include "../msvc/msvc_compat.h"
 
+#ifdef HAVE_CONFIG_H
+#include "../config.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -23,10 +27,13 @@ extern "C" {
 #include <libavutil/avutil.h>
 #include <libavutil/avstring.h>
 #include <libavutil/opt.h>
+#include <libavutil/version.h>
 #include <libavformat/avformat.h>
+#ifdef HAVE_AV_CHANNEL_LAYOUT
+#include <libavutil/channel_layout.h>
+#endif
 #include <libavutil/avconfig.h>
 #include <libavutil/pixdesc.h>
-#include <libavutil/channel_layout.h>
 #include <libswscale/swscale.h>
 #ifdef __cplusplus
 }
@@ -50,8 +57,9 @@ extern "C" {
 #include <time.h>
 #endif
 
-#ifdef HAVE_CONFIG_H
-#include "../config.h"
+#if LIBAVUTIL_VERSION_INT <= AV_VERSION_INT(52, 9, 0)
+#define av_frame_alloc avcodec_alloc_frame
+#define av_frame_free avcodec_free_frame
 #endif
 
 struct ff_video_info
@@ -173,7 +181,8 @@ struct ffemu
 
 static bool ffemu_codec_has_sample_format(enum AVSampleFormat fmt, const enum AVSampleFormat *fmts)
 {
-   for (unsigned i = 0; fmts[i] != AV_SAMPLE_FMT_NONE; i++)
+   unsigned i;
+   for (i = 0; fmts[i] != AV_SAMPLE_FMT_NONE; i++)
       if (fmt == fmts[i])
          return true;
    return false;
@@ -216,6 +225,7 @@ static void ffemu_audio_resolve_format(struct ff_audio_info *audio, const AVCode
 
 static void ffemu_audio_resolve_sample_rate(ffemu_t *handle, const AVCodec *codec)
 {
+   unsigned i;
    struct ff_config_param *params = &handle->config;
    struct ffemu_params *param     = &handle->params;
 
@@ -228,7 +238,7 @@ static void ffemu_audio_resolve_sample_rate(ffemu_t *handle, const AVCodec *code
       int best_rate = codec->supported_samplerates[0];
       int best_diff = best_rate - input_rate;
 
-      for (unsigned i = 1; codec->supported_samplerates[i]; i++)
+      for (i = 1; codec->supported_samplerates[i]; i++)
       {
          int diff = codec->supported_samplerates[i] - input_rate;
 
@@ -282,7 +292,7 @@ static bool ffemu_init_audio(ffemu_t *handle)
 
       rarch_resampler_realloc(&audio->resampler_data,
             &audio->resampler,
-            *g_settings.audio.resampler ? g_settings.audio.resampler : NULL,
+            g_settings.audio.resampler,
             audio->ratio);
    }
    else
@@ -439,7 +449,7 @@ static bool ffemu_init_video(ffemu_t *handle)
 
    size_t size = avpicture_get_size(video->pix_fmt, param->out_width, param->out_height);
    video->conv_frame_buf = (uint8_t*)av_malloc(size);
-   video->conv_frame = avcodec_alloc_frame();
+   video->conv_frame = av_frame_alloc();
    avpicture_fill((AVPicture*)video->conv_frame, video->conv_frame_buf, video->pix_fmt,
          param->out_width, param->out_height);
 
@@ -674,7 +684,7 @@ void ffemu_free(ffemu_t *handle)
       av_free(handle->video.codec);
    }
 
-   av_free(handle->video.conv_frame);
+   av_frame_free(&handle->video.conv_frame);
    av_free(handle->video.conv_frame_buf);
 
    scaler_ctx_gen_reset(&handle->video.scaler);
@@ -702,6 +712,7 @@ void ffemu_free(ffemu_t *handle)
 
 bool ffemu_push_video(ffemu_t *handle, const struct ffemu_video_data *data)
 {
+   unsigned y;
    bool drop_frame = handle->video.frame_drop_count++ % handle->video.frame_drop_ratio;
    handle->video.frame_drop_count %= handle->video.frame_drop_ratio;
    if (drop_frame)
@@ -745,7 +756,7 @@ bool ffemu_push_video(ffemu_t *handle, const struct ffemu_video_data *data)
    fifo_write(handle->attr_fifo, &attr_data, sizeof(attr_data));
 
    int offset = 0;
-   for (unsigned y = 0; y < attr_data.height; y++, offset += data->pitch)
+   for (y = 0; y < attr_data.height; y++, offset += data->pitch)
       fifo_write(handle->video_fifo, (const uint8_t*)data->data + offset, attr_data.pitch);
 
    slock_unlock(handle->lock);
@@ -882,7 +893,8 @@ static bool ffemu_push_video_thread(ffemu_t *handle, const struct ffemu_video_da
 
 static void planarize_float(float *out, const float *in, size_t frames)
 {
-   for (size_t i = 0; i < frames; i++)
+   size_t i;
+   for (i = 0; i < frames; i++)
    {
       out[i] = in[2 * i + 0];
       out[i + frames] = in[2 * i + 1];
@@ -891,7 +903,8 @@ static void planarize_float(float *out, const float *in, size_t frames)
 
 static void planarize_s16(int16_t *out, const int16_t *in, size_t frames)
 {
-   for (size_t i = 0; i < frames; i++)
+   size_t i;
+   for (i = 0; i < frames; i++)
    {
       out[i] = in[2 * i + 0];
       out[i + frames] = in[2 * i + 1];
@@ -927,7 +940,7 @@ static bool encode_audio(ffemu_t *handle, AVPacket *pkt, bool dry)
    pkt->data = handle->audio.outbuf;
    pkt->size = handle->audio.outbuf_size;
 
-   AVFrame *frame = avcodec_alloc_frame();
+   AVFrame *frame = av_frame_alloc();
    if (!frame)
       return false;
 
@@ -951,7 +964,7 @@ static bool encode_audio(ffemu_t *handle, AVPacket *pkt, bool dry)
    if (avcodec_encode_audio2(handle->audio.codec,
             pkt, dry ? NULL : frame, &got_packet) < 0)
    {
-      avcodec_free_frame(&frame);
+      av_frame_free(&frame);
       return false;
    }
 
@@ -960,7 +973,7 @@ static bool encode_audio(ffemu_t *handle, AVPacket *pkt, bool dry)
       pkt->size = 0;
       pkt->pts = AV_NOPTS_VALUE;
       pkt->dts = AV_NOPTS_VALUE;
-      avcodec_free_frame(&frame);
+      av_frame_free(&frame);
       return true;
    }
 
@@ -978,7 +991,7 @@ static bool encode_audio(ffemu_t *handle, AVPacket *pkt, bool dry)
             handle->muxer.astream->time_base);
    }
 
-   avcodec_free_frame(&frame);
+   av_frame_free(&frame);
 
    pkt->stream_index = handle->muxer.astream->index;
    return true;

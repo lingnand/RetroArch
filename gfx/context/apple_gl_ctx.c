@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2013 - Jason Fetters
+ *  Copyright (C) 2012-2014 - Jason Fetters
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -16,7 +17,7 @@
 #include "../../driver.h"
 #include "../gfx_common.h"
 #include "../gl_common.h"
-#include "../image.h"
+#include "../image/image.h"
 
 #include "../fonts/gl_font.h"
 #include <stdint.h>
@@ -25,34 +26,9 @@
 #include "../shader_glsl.h"
 #endif
 
-#include "../../apple/RetroArch/rarch_wrapper.h"
+#include "../../apple/common/rarch_wrapper.h"
 
-static bool gfx_ctx_bind_api(enum gfx_ctx_api api)
-{
-#ifdef IOS
-   return api == GFX_CTX_OPENGL_ES_API;
-#else
-   return api == GFX_CTX_OPENGL_API;
-#endif
-}
-
-static bool gfx_ctx_set_video_mode(
-      unsigned width, unsigned height,
-      bool fullscreen)
-{
-   (void)width;
-   (void)height;
-   (void)fullscreen;
-   return true;
-}
-
-static void gfx_ctx_update_window_title(void)
-{
-   char buf[128];
-   gfx_get_fps(buf, sizeof(buf), false);
-}
-
-static void gfx_ctx_check_window(bool *quit,
+static void gfx_ctx_check_window(void *data, bool *quit,
       bool *resize, unsigned *width, unsigned *height, unsigned frame_count)
 {
    (void)frame_count;
@@ -60,7 +36,7 @@ static void gfx_ctx_check_window(bool *quit,
    *quit = false;
 
    unsigned new_width, new_height;
-   apple_get_game_view_size(&new_width, &new_height);
+   apple_gfx_ctx_get_video_size(data, &new_width, &new_height);
    if (new_width != *width || new_height != *height)
    {
       *width  = new_width;
@@ -69,45 +45,36 @@ static void gfx_ctx_check_window(bool *quit,
    }
 }
 
-static void gfx_ctx_set_resize(unsigned width, unsigned height)
+static void gfx_ctx_set_resize(void *data, unsigned width, unsigned height)
 {
+   (void)data;
    (void)width;
    (void)height;
 }
 
-static bool gfx_ctx_has_focus(void)
+static void gfx_ctx_input_driver(void *data, const input_driver_t **input, void **input_data)
 {
-   return true;
-}
-
-static void gfx_ctx_swap_buffers(void)
-{
-   apple_flip_game_view();
-}
-
-static void gfx_ctx_input_driver(const input_driver_t **input, void **input_data)
-{
+   (void)data;
    *input = NULL;
    *input_data = NULL;
 }
 
 // The apple_* functions are implemented in apple/RetroArch/RAGameView.m
-
 const gfx_ctx_driver_t gfx_ctx_apple = {
-   apple_init_game_view,
-   apple_destroy_game_view,
-   gfx_ctx_bind_api,
-   apple_set_game_view_sync,
-   gfx_ctx_set_video_mode,
-   apple_get_game_view_size,
+   apple_gfx_ctx_init,
+   apple_gfx_ctx_destroy,
+   apple_gfx_ctx_bind_api,
+   apple_gfx_ctx_swap_interval,
+   apple_gfx_ctx_set_video_mode,
+   apple_gfx_ctx_get_video_size,
    NULL,
-   gfx_ctx_update_window_title,
+   apple_gfx_ctx_update_window_title,
    gfx_ctx_check_window,
    gfx_ctx_set_resize,
-   gfx_ctx_has_focus,
-   apple_flip_game_view,
+   apple_gfx_ctx_has_focus,
+   apple_gfx_ctx_swap_buffers,
    gfx_ctx_input_driver,
+   apple_gfx_ctx_get_proc_address,
    NULL,
-   NULL,
-   "ios",
+   "apple",
 };

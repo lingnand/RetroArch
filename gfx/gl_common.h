@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -35,61 +35,27 @@
 #include <EGL/eglext.h>
 #endif
 
-#if defined(IOS)
-#include <OpenGLES/ES2/gl.h>
-#include <OpenGLES/ES2/glext.h>
-#elif defined(__APPLE__)
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
-#elif defined(HAVE_PSGL)
-#include <PSGL/psgl.h>
-#include <PSGL/psglu.h>
-#include <GLES/glext.h>
-#elif defined(HAVE_OPENGL_MODERN)
-#include <GL3/gl3.h>
-#include <GL3/gl3ext.h>
-#elif defined(HAVE_OPENGLES2)
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-#elif defined(HAVE_OPENGLES1)
-#include <GLES/gl.h>
-#include <GLES/glext.h>
-#else
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
-#endif
+#include "glsym/glsym.h"
 
-#define context_get_video_size_func(win, height)     gl->ctx_driver->get_video_size(win, height)
-#define context_update_window_title_func()           gl->ctx_driver->update_window_title()
-#define context_destroy_func()                       gl->ctx_driver->destroy()
-#define context_translate_aspect_func(width, height) gl->ctx_driver->translate_aspect(width, height)
-#define context_set_resize_func(width, height)       gl->ctx_driver->set_resize(width, height)
-#define context_swap_buffers_func()                  gl->ctx_driver->swap_buffers()
-#define context_post_render_func(gl)                 gl->ctx_driver->post_render(gl)
-#define context_swap_interval_func(var)              gl->ctx_driver->swap_interval(var)
-#define context_has_focus_func()                     gl->ctx_driver->has_focus()
-#define context_check_window_func(quit, resize, width, height, frame_count) \
-   gl->ctx_driver->check_window(quit, resize, width, height, frame_count)
+#define context_get_video_size_func(gl, win, height)     gl->ctx_driver->get_video_size(gl, win, height)
+#define context_update_window_title_func(gl)             gl->ctx_driver->update_window_title(gl)
+#define context_destroy_func(gl)                         gl->ctx_driver->destroy(gl)
+#define context_translate_aspect_func(gl, width, height) gl->ctx_driver->translate_aspect(gl, width, height)
+#define context_set_resize_func(gl, width, height)       gl->ctx_driver->set_resize(gl, width, height)
+#define context_swap_buffers_func(gl)                    gl->ctx_driver->swap_buffers(gl)
+#define context_swap_interval_func(gl, var)              gl->ctx_driver->swap_interval(gl, var)
+#define context_has_focus_func(gl)                       gl->ctx_driver->has_focus(gl)
+#define context_check_window_func(gl, quit, resize, width, height, frame_count) \
+   gl->ctx_driver->check_window(gl, quit, resize, width, height, frame_count)
 
-#define context_set_video_mode_func(width, height, fullscreen) gl->ctx_driver->set_video_mode(width, height, fullscreen)
-#define context_input_driver_func(input, input_data) gl->ctx_driver->input_driver(input, input_data)
+#define context_set_video_mode_func(gl, width, height, fullscreen) gl->ctx_driver->set_video_mode(gl, width, height, fullscreen)
+#define context_input_driver_func(gl, input, input_data) gl->ctx_driver->input_driver(gl, input, input_data)
 
 #ifdef HAVE_EGL
-#define context_init_egl_image_buffer_func(video)    gl->ctx_driver->init_egl_image_buffer(video)
-#define context_write_egl_image_func(frame, width, height, pitch, base_size, tex_index, img) \
-   gl->ctx_driver->write_egl_image(frame, width, height, pitch, base_size, tex_index,img)
+#define context_init_egl_image_buffer_func(gl, video)    gl->ctx_driver->init_egl_image_buffer(gl, video)
+#define context_write_egl_image_func(gl, frame, width, height, pitch, base_size, tex_index, img) \
+   gl->ctx_driver->write_egl_image(gl, frame, width, height, pitch, base_size, tex_index,img)
 #endif
-
-static inline bool gl_query_extension(const char *ext)
-{
-   const char *str = (const char*)glGetString(GL_EXTENSIONS);
-   bool ret = str && strstr(str, ext);
-   RARCH_LOG("Querying GL extension: %s => %s\n",
-         ext, ret ? "exists" : "doesn't exist");
-
-   return ret;
-}
 
 static inline bool gl_check_error(void)
 {
@@ -167,13 +133,15 @@ struct gl_coords
 typedef struct gl_shader_backend gl_shader_backend_t;
 
 #define MAX_SHADERS 16
+#define MAX_TEXTURES 8
 
-#if (defined(HAVE_GLSL) || defined(HAVE_CG))
-#define TEXTURES 8
-#else
-#define TEXTURES 1
-#endif
-#define TEXTURES_MASK (TEXTURES - 1)
+struct gl_overlay_data
+{
+   GLuint tex;
+   GLfloat tex_coord[8];
+   GLfloat vertex_coord[8];
+   GLfloat alpha_mod;
+};
 
 typedef struct gl
 {
@@ -181,9 +149,10 @@ typedef struct gl
    const gl_shader_backend_t *shader;
 
    bool vsync;
-   GLuint texture[TEXTURES];
+   GLuint texture[MAX_TEXTURES];
    unsigned tex_index; // For use with PREV.
-   struct gl_tex_info prev_info[TEXTURES];
+   unsigned textures;
+   struct gl_tex_info prev_info[MAX_TEXTURES];
    GLuint tex_filter;
 
    void *empty_buf;
@@ -202,10 +171,11 @@ typedef struct gl
    int fbo_pass;
    bool fbo_inited;
 
-   GLuint hw_render_fbo[TEXTURES];
-   GLuint hw_render_depth[TEXTURES];
+   GLuint hw_render_fbo[MAX_TEXTURES];
+   GLuint hw_render_depth[MAX_TEXTURES];
    bool hw_render_fbo_init;
    bool hw_render_depth_init;
+   bool has_fp_fbo;
 #endif
    bool hw_render_use;
 
@@ -222,44 +192,50 @@ typedef struct gl
    struct rarch_viewport vp;
    unsigned vp_out_width;
    unsigned vp_out_height;
-   unsigned last_width[TEXTURES];
-   unsigned last_height[TEXTURES];
+   unsigned last_width[MAX_TEXTURES];
+   unsigned last_height[MAX_TEXTURES];
    unsigned tex_w, tex_h;
    GLfloat tex_coords[8];
    math_matrix mvp, mvp_no_rot;
 
    struct gl_coords coords;
+   const GLfloat *vertex_ptr;
+   const GLfloat *white_color_ptr;
 
    GLuint pbo;
 
    GLenum internal_fmt;
    GLenum texture_type; // RGB565 or ARGB
    GLenum texture_fmt;
-   GLenum border_type;
+   GLenum wrap_mode;
    unsigned base_size; // 2 or 4
+#ifdef HAVE_OPENGLES
+   bool support_unpack_row_length;
+#else
+   bool have_es2_compat;
+#endif
 
    // Fonts
    void *font;
    const gl_font_renderer_t *font_ctx;
    const font_renderer_driver_t *font_driver;
    GLuint font_tex;
+   GLint max_font_size;
    int font_tex_w, font_tex_h;
-   uint16_t *font_tex_buf;
+   uint32_t *font_tex_buf;
    char font_last_msg[256];
    int font_last_width, font_last_height;
    GLfloat font_color[16];
    GLfloat font_color_dark[16];
 
    bool egl_images;
+   video_info_t video_info;
 
 #ifdef HAVE_OVERLAY
-   // Overlay rendering
+   struct gl_overlay_data *overlay;
+   unsigned overlays;
    bool overlay_enable;
    bool overlay_full_screen;
-   GLuint tex_overlay;
-   GLfloat overlay_tex_coord[8];
-   GLfloat overlay_vertex_coord[8];
-   GLfloat overlay_alpha_mod;
 #endif
 
 #if !defined(HAVE_OPENGLES) && defined(HAVE_FFMPEG)
@@ -270,8 +246,9 @@ typedef struct gl
    unsigned pbo_readback_index;
    struct scaler_ctx pbo_readback_scaler;
 #endif
+   void *readback_buffer_screenshot;
 
-#if defined(HAVE_RGUI) || defined(HAVE_RMENU)
+#if defined(HAVE_MENU)
    GLuint rgui_texture;
    bool rgui_texture_enable;
    bool rgui_texture_full_screen;
@@ -284,20 +261,14 @@ typedef struct gl
    GLsync fences[MAX_FENCES];
    unsigned fence_count;
 #endif
-} gl_t;
 
-// Windows ... <_<
-#ifdef _WIN32
-extern PFNGLCLIENTACTIVETEXTUREPROC pglClientActiveTexture;
-extern PFNGLACTIVETEXTUREPROC pglActiveTexture;
-#else
-#define pglClientActiveTexture glClientActiveTexture
-#define pglActiveTexture glActiveTexture
-#endif
+   bool core_context;
+   GLuint vao;
+} gl_t;
 
 #if defined(HAVE_PSGL)
 #define RARCH_GL_INTERNAL_FORMAT32 GL_ARGB_SCE
-#define RARCH_GL_INTERNAL_FORMAT16 GL_RGB5
+#define RARCH_GL_INTERNAL_FORMAT16 GL_RGB5 // TODO: Verify if this is really 565 or just 555.
 #define RARCH_GL_TEXTURE_TYPE32 GL_BGRA
 #define RARCH_GL_TEXTURE_TYPE16 GL_BGRA
 #define RARCH_GL_FORMAT32 GL_UNSIGNED_INT_8_8_8_8_REV
@@ -319,17 +290,36 @@ extern PFNGLACTIVETEXTUREPROC pglActiveTexture;
 #define RARCH_GL_FORMAT16 GL_UNSIGNED_SHORT_5_6_5
 #else
 // On desktop, we always use 32-bit.
-#define RARCH_GL_INTERNAL_FORMAT32 GL_RGBA
-#define RARCH_GL_INTERNAL_FORMAT16 GL_RGBA
+#define RARCH_GL_INTERNAL_FORMAT32 GL_RGBA8
+#define RARCH_GL_INTERNAL_FORMAT16 GL_RGBA8
 #define RARCH_GL_TEXTURE_TYPE32 GL_BGRA
 #define RARCH_GL_TEXTURE_TYPE16 GL_BGRA
 #define RARCH_GL_FORMAT32 GL_UNSIGNED_INT_8_8_8_8_REV
 #define RARCH_GL_FORMAT16 GL_UNSIGNED_INT_8_8_8_8_REV
+
+// GL_RGB565 internal format isn't in desktop GL until 4.1 core (ARB_ES2_compatibility).
+// Check for this.
+#ifndef GL_RGB565
+#define GL_RGB565 0x8D62
+#endif
+#define RARCH_GL_INTERNAL_FORMAT16_565 GL_RGB565
+#define RARCH_GL_TEXTURE_TYPE16_565 GL_RGB
+#define RARCH_GL_FORMAT16_565 GL_UNSIGNED_SHORT_5_6_5
 #endif
 
 // Platform specific workarounds/hacks.
 #if defined(__CELLOS_LV2__)
-#define NO_GL_READ_VIEWPORT
+#define NO_GL_READ_PIXELS
+
+// Performance hacks
+#ifdef HAVE_GCMGL
+extern GLvoid* glMapBufferTextureReferenceRA( GLenum target, GLenum access );
+extern GLboolean glUnmapBufferTextureReferenceRA( GLenum target );
+extern void glBufferSubDataTextureReferenceRA( GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data );
+#define glMapBuffer(target, access) glMapBufferTextureReferenceRA(target, access)
+#define glUnmapBuffer(target) glUnmapBufferTextureReferenceRA(target)
+#define glBufferSubData(target, offset, size, data) glBufferSubDataTextureReferenceRA(target, offset, size, data)
+#endif
 #endif
 
 #if defined(HAVE_OPENGL_MODERN) || defined(HAVE_OPENGLES2) || defined(HAVE_PSGL)
@@ -344,12 +334,13 @@ extern PFNGLACTIVETEXTUREPROC pglActiveTexture;
 #define NO_GL_CLAMP_TO_BORDER
 #endif
 
-#if defined(HAVE_OPENGLES2) // It's an extension. Don't bother checking for it atm.
-#undef GL_UNPACK_ROW_LENGTH
+#if defined(HAVE_OPENGLES)
+
+#ifndef GL_UNPACK_ROW_LENGTH
+#define GL_UNPACK_ROW_LENGTH  0x0CF2
 #endif
 
-extern const GLfloat vertexes_flipped[];
-extern const GLfloat white_color[];
+#endif
 
 void gl_set_projection(void *data, struct gl_ortho *ortho, bool allow_rotate);
 void gl_set_viewport(void *data, unsigned width, unsigned height, bool force_full, bool allow_rotate);
@@ -357,6 +348,27 @@ void gl_shader_set_coords(void *data, const struct gl_coords *coords, const math
 
 void gl_init_fbo(void *data, unsigned width, unsigned height);
 void gl_deinit_fbo(void *data);
+
+static inline GLenum gl_wrap_type_to_enum(enum gfx_wrap_type type)
+{
+   switch (type)
+   {
+#ifndef HAVE_OPENGLES
+      case RARCH_WRAP_BORDER:
+         return GL_CLAMP_TO_BORDER;
+#else
+      case RARCH_WRAP_BORDER:
+#endif
+      case RARCH_WRAP_EDGE:
+         return GL_CLAMP_TO_EDGE;
+      case RARCH_WRAP_REPEAT:
+         return GL_REPEAT;
+      case RARCH_WRAP_MIRRORED_REPEAT:
+         return GL_MIRRORED_REPEAT;
+      default:
+         return 0;
+   }
+}
 
 #endif
 

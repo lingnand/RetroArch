@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -14,57 +14,53 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../../../frontend/frontend_android.h"
+#include "../../../frontend/platform/platform_android.h"
 #include "jni_macros.h"
 #include "input_autodetect.h"
 
 static void input_autodetect_get_device_name(void *data, char *buf, size_t size, int id)
 {
-   struct android_app *android_app = (struct android_app*)data;
+   JNIEnv *env = jni_thread_getenv();
+   if (!env)
+      return;
+
    buf[0] = '\0';
 
-   JavaVM *vm = android_app->activity->vm;
-   JNIEnv *env = NULL;
-   (*vm)->AttachCurrentThread(vm, &env, 0);
-
-   jclass input_device_class = NULL;
-   FIND_CLASS(env, input_device_class, "android/view/InputDevice");
-   if (!input_device_class)
-      goto end;
+   jclass class = NULL;
+   FIND_CLASS(env, class, "android/view/InputDevice");
+   if (!class)
+      return;
 
    jmethodID method = NULL;
-   GET_STATIC_METHOD_ID(env, method, input_device_class, "getDevice", "(I)Landroid/view/InputDevice;");
+   GET_STATIC_METHOD_ID(env, method, class, "getDevice", "(I)Landroid/view/InputDevice;");
    if (!method)
-      goto end;
+      return;
 
    jobject device = NULL;
-   CALL_OBJ_STATIC_METHOD_PARAM(env, device, input_device_class, method, (jint)id);
+   CALL_OBJ_STATIC_METHOD_PARAM(env, device, class, method, (jint)id);
    if (!device)
    {
       RARCH_ERR("Failed to find device for ID: %d\n", id);
-      goto end;
+      return;
    }
 
    jmethodID getName = NULL;
-   GET_METHOD_ID(env, getName, input_device_class, "getName", "()Ljava/lang/String;");
+   GET_METHOD_ID(env, getName, class, "getName", "()Ljava/lang/String;");
    if (!getName)
-      goto end;
+      return;
 
    jobject name = NULL;
    CALL_OBJ_METHOD(env, name, device, getName);
    if (!name)
    {
       RARCH_ERR("Failed to find name for device ID: %d\n", id);
-      goto end;
+      return;
    }
 
    const char *str = (*env)->GetStringUTFChars(env, name, 0);
    if (str)
       strlcpy(buf, str, size);
    (*env)->ReleaseStringUTFChars(env, name, str);
-
-end:
-   (*vm)->DetachCurrentThread(vm);
 }
 
 void input_autodetect_setup(void *data, char *msg, size_t sizeof_msg, unsigned port, unsigned id, int source, bool *primary)
@@ -133,6 +129,10 @@ void input_autodetect_setup(void *data, char *msg, size_t sizeof_msg, unsigned p
       device = DEVICE_SUPER_SMARTJOY;
    else if (strstr(name_buf, "Jess Tech Dual Analog Rumble Pad"))
       device = DEVICE_SAITEK_RUMBLE_P480;
+   else if (strstr(name_buf, "mtk-kpd"))
+      device = DEVICE_MUCH_IREADGO_I5;
+   else if (strstr(name_buf, "Wikipad"))
+      device = DEVICE_WIKIPAD;
    else if (strstr(name_buf, "Microsoft"))
    {
       if (strstr(name_buf, "Dual Strike"))
@@ -185,6 +185,8 @@ void input_autodetect_setup(void *data, char *msg, size_t sizeof_msg, unsigned p
       device = DEVICE_USB_2_AXIS_8_BUTTON_GAMEPAD;
    else if (strstr(name_buf, "BUFFALO BGC-FC801"))
       device = DEVICE_BUFFALO_BGC_FC801;
+   else if (strstr(name_buf, "8Bitdo FC30"))
+      device = DEVICE_FC30_GAMEPAD;
    else if (strstr(name_buf, "RetroUSB.com RetroPad"))
       device = DEVICE_RETROUSB_RETROPAD;
    else if (strstr(name_buf, "RetroUSB.com SNES RetroPort"))
@@ -201,12 +203,16 @@ void input_autodetect_setup(void *data, char *msg, size_t sizeof_msg, unsigned p
       device = DEVICE_ARCHOS_GAMEPAD;
    else if (strstr(name_buf, "matrix_keyboard"))
       device = DEVICE_JXD_S5110;
+   else if (strstr(name_buf, "tincore_adc_joystick"))
+      device = DEVICE_JXD_S5110_SKELROM;
    else if (strstr(name_buf, "keypad-zeus") || (strstr(name_buf, "keypad-game-zeus")))
       device = DEVICE_XPERIA_PLAY;
    else if (strstr(name_buf, "Broadcom Bluetooth HID"))
       device = DEVICE_BROADCOM_BLUETOOTH_HID;
    else if (strstr(name_buf, "USB Gamepad"))
       device = DEVICE_THRUST_PREDATOR;
+   else if (strstr(name_buf, "ADC joystick"))
+      device = DEVICE_JXD_S7800B;
    else if (strstr(name_buf, "DragonRise"))
       device = DEVICE_DRAGONRISE;
    else if (strstr(name_buf, "Thrustmaster T Mini"))
@@ -225,6 +231,8 @@ void input_autodetect_setup(void *data, char *msg, size_t sizeof_msg, unsigned p
       port = 0; // Shield is always player 1.
       *primary = true;
    }
+   else if (strstr(name_buf, "Samsung Game Pad EI-GP20"))
+      device = DEVICE_SAMSUNG_GAMEPAD_EIGP20;
 
    if (strstr(current_ime, "net.obsidianx.android.mogaime"))
    {

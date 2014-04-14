@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -17,6 +17,8 @@
 #ifndef _LOGGER_H_
 #define _LOGGER_H_
 
+#include <stdarg.h>
+
 #define BUFSIZE	(64 * 1024)
 #define TCPDUMP_STACKSIZE	(16 * 1024)
 #define TCPDUMP_PRIO	(2048)
@@ -24,5 +26,6 @@
 void logger_init (void);
 void logger_shutdown (void);
 void logger_send (const char *__format,...);
+void logger_send_v(const char *__format, va_list args);
 
 #endif

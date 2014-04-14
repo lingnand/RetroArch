@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -19,6 +19,10 @@
 #include <stdint.h>
 #include "../../boolean.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct d3d_font_renderer
 {
    bool (*init)(void *data, const char *font_path, unsigned font_size);
@@ -29,9 +33,14 @@ typedef struct d3d_font_renderer
 
 extern const d3d_font_renderer_t d3d_xbox360_font;
 extern const d3d_font_renderer_t d3d_xdk1_font;
+extern const d3d_font_renderer_t d3d_win32_font;
 
 const d3d_font_renderer_t *d3d_font_init_first(void *data,
       const char *font_path, unsigned font_size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

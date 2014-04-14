@@ -3,10 +3,6 @@ BASEDIR =  $$quote($$_PRO_FILE_PWD_)
 
 device {
     CONFIG(debug, debug|release) {
-        INCLUDEPATH +=  $$quote("C:\bbstuff\RetroArch-master")
-
-        DEPENDPATH +=  $$quote("C:\bbstuff\RetroArch-master")
-
         SOURCES +=  $$quote($$BASEDIR/src/ButtonMap.cpp) \
                  $$quote($$BASEDIR/src/RetroArch-Cascades.cpp) \
                  $$quote($$BASEDIR/src/main.cpp) \
@@ -18,10 +14,6 @@ device {
     }
 
     CONFIG(release, debug|release) {
-        INCLUDEPATH +=  $$quote("C:\bbstuff\RetroArch-master")
-
-        DEPENDPATH +=  $$quote("C:\bbstuff\RetroArch-master")
-
         SOURCES +=  $$quote($$BASEDIR/src/ButtonMap.cpp) \
                  $$quote($$BASEDIR/src/RetroArch-Cascades.cpp) \
                  $$quote($$BASEDIR/src/main.cpp) \

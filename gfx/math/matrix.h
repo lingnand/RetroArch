@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -16,7 +16,7 @@
 #ifndef MATH_MATRIX_H__
 #define MATH_MATRIX_H__
 
-// Colunm-major matrix (OpenGL-style).
+// Column-major matrix (OpenGL-style).
 // Reimplements functionality from FF OpenGL pipeline to be able to work on GLES 2.0 and modern GL variants.
 typedef struct math_matrix
 {

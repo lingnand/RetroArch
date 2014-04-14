@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -75,7 +75,7 @@
 #define PSP_CTRL_L SCE_CTRL_L
 #define PSP_CTRL_R SCE_CTRL_R
 
-#define CtrlReadBufferPositive(port, pad_data, bufs) sceCtrlReadBufferPositive(port, pad_data, bufs)
+#define CtrlPeekBufferPositive(port, pad_data, bufs) sceCtrlPeekBufferPositive(port, pad_data, bufs)
 
 #elif defined(PSP)
 
@@ -90,7 +90,7 @@
 
 #define DEFAULT_SAMPLING_MODE (PSP_CTRL_MODE_ANALOG)
 
-#define CtrlReadBufferPositive(port, pad_data, bufs) sceCtrlReadBufferPositive(pad_data, bufs)
+#define CtrlPeekBufferPositive(port, pad_data, bufs) sceCtrlPeekBufferPositive(pad_data, bufs)
 #endif
 
 #endif

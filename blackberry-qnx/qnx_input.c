@@ -1,5 +1,7 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
+ *  Copyright (C) 2013-2014 - CatalystG
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -299,7 +301,7 @@ static void process_touch_event(screen_event_t event, int type)
 {
    int contact_id;
    int pos[2];
-   int i;
+   unsigned int i;
 
    screen_get_event_property_iv(event, SCREEN_PROPERTY_TOUCH_ID, (int*)&contact_id);
    screen_get_event_property_iv(event, SCREEN_PROPERTY_SOURCE_POSITION, pos);
@@ -336,7 +338,7 @@ static void process_touch_event(screen_event_t event, int type)
 
                //Remove touch from map and shift remaining valid ones to the front
                touch_map[touch[i].map] = -1;
-               int j;
+               unsigned int j;
                for(j=touch[i].map;j<touch_count;++j)
                {
                  touch_map[j] = touch_map[j+1];
@@ -508,7 +510,7 @@ static void *qnx_input_init(void)
 
    //Get screen dimensions
    if(gfx_ctx_bbqnx.get_video_size)
-      gfx_ctx_bbqnx.get_video_size(&screen_width, &screen_height);
+      gfx_ctx_bbqnx.get_video_size(NULL, &screen_width, &screen_height);
 
    if(initialized)
       return (void*)-1;
@@ -627,7 +629,7 @@ static int16_t qnx_input_state(void *data, const struct retro_keybind **retro_ke
 
 static bool qnx_input_key_pressed(void *data, int key)
 {
-   return ((g_extern.lifecycle_state | driver.overlay_state ) & (1ULL << key));
+   return ((g_extern.lifecycle_state | driver.overlay_state.buttons ) & (1ULL << key));
 }
 
 static void qnx_input_free_input(void *data)
@@ -645,46 +647,6 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
    size_t arr_size = sizeof(platform_keys) / sizeof(platform_keys[0]);
 
    (void)device;
-
-   if (keybind_action & (1ULL << KEYBINDS_ACTION_DECREMENT_BIND))
-   {
-      if (joykey == NO_BTN)
-         *key = platform_keys[arr_size - 1].joykey;
-      else if (platform_keys[0].joykey == joykey)
-         *key = NO_BTN;
-      else
-      {
-         *key = NO_BTN;
-         for (size_t i = 1; i < arr_size; i++)
-         {
-            if (platform_keys[i].joykey == joykey)
-            {
-               *key = platform_keys[i - 1].joykey;
-               break;
-            }
-         }
-      }
-   }
-
-   if (keybind_action & (1ULL << KEYBINDS_ACTION_INCREMENT_BIND))
-   {
-      if (joykey == NO_BTN)
-         *key = platform_keys[0].joykey;
-      else if (platform_keys[arr_size - 1].joykey == joykey)
-         *key = NO_BTN;
-      else
-      {
-         *key = NO_BTN;
-         for (size_t i = 0; i < arr_size - 1; i++)
-         {
-            if (platform_keys[i].joykey == joykey)
-            {
-               *key = platform_keys[i + 1].joykey;
-               break;
-            }
-         }
-      }
-   }
 
    if (keybind_action & (1ULL << KEYBINDS_ACTION_SET_DEFAULT_BIND))
       *key = g_settings.input.binds[port][id].def_joykey;
@@ -716,7 +678,6 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L3].def_joykey     = SCREEN_L3_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R3].def_joykey     = SCREEN_R3_GAME_BUTTON;
             g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = SCREEN_MENU3_GAME_BUTTON;
-            g_settings.input.dpad_emulation[port] = ANALOG_DPAD_NONE;
             controller->port = port;
             port_device[port] = controller;
             break;
@@ -741,7 +702,6 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L3].def_joykey     = NO_BTN;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R3].def_joykey     = NO_BTN;
             g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = KEYCODE_P & 0xFF;
-            g_settings.input.dpad_emulation[port] = ANALOG_DPAD_NONE;
             controller->port = port;
             port_device[port] = controller;
             break;
@@ -767,7 +727,6 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L3].def_joykey     = NO_BTN;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R3].def_joykey     = NO_BTN;
             g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = KEYCODE_TILDE;
-            g_settings.input.dpad_emulation[port] = ANALOG_DPAD_NONE;
             controller->port = port;
             port_device[port] = controller;
             break;
@@ -792,7 +751,6 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L3].def_joykey     = 0;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R3].def_joykey     = 0;
             g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = 0;
-            g_settings.input.dpad_emulation[port] = ANALOG_DPAD_NONE;
             controller->port = port;
             port_device[port] = controller;
             break;
@@ -818,7 +776,6 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L3].def_joykey     = SCREEN_L3_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R3].def_joykey     = SCREEN_R3_GAME_BUTTON;
             g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = NO_BTN; //TODO: Find a good mappnig
-            g_settings.input.dpad_emulation[port] = ANALOG_DPAD_NONE;
             controller->port = port;
             port_device[port] = controller;
             break;
@@ -884,6 +841,19 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
 #endif
 }
 
+static uint64_t qnx_input_get_capabilities(void *data)
+{
+   uint64_t caps = 0;
+
+   caps |= (1 << RETRO_DEVICE_JOYPAD);
+   caps |= (1 << RETRO_DEVICE_POINTER);
+#ifdef HAVE_BB10
+   caps |= (1 << RETRO_DEVICE_ANALOG);
+#endif
+
+   return caps;
+}
+
 const input_driver_t input_qnx = {
    qnx_input_init,
    qnx_input_poll,
@@ -891,6 +861,8 @@ const input_driver_t input_qnx = {
    qnx_input_key_pressed,
    qnx_input_free_input,
    qnx_input_set_keybinds,
+   NULL,
+   NULL,
+   qnx_input_get_capabilities,
    "qnx_input",
 };
-

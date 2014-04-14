@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -25,14 +25,7 @@
 
 typedef struct
 {
-   char menu_border_file[MAXIMUM_PATH];
-   char border_dir[MAXIMUM_PATH];
    char core_dir[MAXIMUM_PATH];
-   char config_path[MAXIMUM_PATH];
-   char libretro_path[MAXIMUM_PATH];
-   char filebrowser_startup_dir[MAXIMUM_PATH];
-   char filesystem_root_dir[MAXIMUM_PATH];
-   char input_presets_dir[MAXIMUM_PATH];
    char port_dir[MAXIMUM_PATH];
    char savestate_dir[MAXIMUM_PATH];
    char sram_dir[MAXIMUM_PATH];

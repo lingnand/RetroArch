@@ -14,7 +14,6 @@ Page {
                 }
                 else 
                 {
-
                     RetroArch.startEmulator();
                 }
             }

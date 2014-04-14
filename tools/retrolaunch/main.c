@@ -126,6 +126,7 @@ static int get_sha1(const char *path, char *result)
 	}
 
 	if (!SHA1Result(&sha)) {
+		close(fd);
 		return -1;
 	}
 
@@ -134,6 +135,7 @@ static int get_sha1(const char *path, char *result)
 		sha.Message_Digest[1],
 		sha.Message_Digest[2],
 		sha.Message_Digest[3], sha.Message_Digest[4]);
+	close(fd);
 	return 0;
 }
 
@@ -230,6 +232,7 @@ const char *SUFFIX_MATCH[] = {
 	".smd", "smd",
 	".sms", "sms",
 	".wsc", "wswan",
+	".z64", "n64",
 	NULL
 };
 
@@ -342,7 +345,7 @@ static int select_core(char *core_path, size_t max_len,
 	goto clean;
 
 success:
-	snprintf(core_path, max_len, "./cores/libretro-%s.so", token);
+	snprintf(core_path, max_len, "./cores/%s.so", token);
 	rv = 0;
 clean:
 	close(fd);

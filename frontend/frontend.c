@@ -1,6 +1,7 @@
 /* RetroArch - A frontend for libretro.
- * Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- * Copyright (C) 2011-2013 - Daniel De Matteis
+ * Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ * Copyright (C) 2011-2014 - Daniel De Matteis
+ * Copyright (C) 2012-2014 - Michael Lelli
  *
  * RetroArch is free software: you can redistribute it and/or modify it under the terms
  * of the GNU General Public License as published by the Free Software Found-
@@ -14,6 +15,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "frontend.h"
 #include "../general.h"
 #include "../conf/config_file.h"
 #include "../file.h"
@@ -21,10 +23,9 @@
 #include "frontend_context.h"
 frontend_ctx_driver_t *frontend_ctx;
 
-#if defined(HAVE_RGUI) || defined(HAVE_RMENU) || defined(HAVE_RMENU_XUI)
-#define HAVE_MENU
-#else
-#undef HAVE_MENU
+#if defined(HAVE_MENU)
+#include "menu/menu_input_line_cb.h"
+#include "menu/menu_common.h"
 #endif
 
 #include "../file_ext.h"
@@ -34,272 +35,255 @@ frontend_ctx_driver_t *frontend_ctx;
 
 default_paths_t default_paths;
 
-// Rename core filename executable to a more sane name.
-static bool libretro_install_core(const char *path_prefix,
-      const char *core_exe_path)
+static void rarch_get_environment_console(void)
 {
-   char old_path[PATH_MAX], new_path[PATH_MAX];
-
-   libretro_get_current_core_pathname(old_path, sizeof(old_path));
-
-   strlcat(old_path, DEFAULT_EXE_EXT, sizeof(old_path));
-   snprintf(new_path, sizeof(new_path), "%s%s", path_prefix, old_path);
-
-   /* If core already exists, we are upgrading the core - 
-    * delete existing file first. */
-   if (path_file_exists(new_path))
-   {
-      RARCH_LOG("Removing temporary ROM file: %s.\n", new_path);
-      if (remove(new_path) < 0)
-         RARCH_ERR("Failed to remove file: %s.\n", new_path);
-   }
-
-   /* Now attempt the renaming of the core. */
-   RARCH_LOG("Renaming core to: %s.\n", new_path);
-   if (rename(core_exe_path, new_path) < 0)
-   {
-      RARCH_ERR("Failed to rename core.\n");
-      return false;
-   }
-
-   strlcpy(g_settings.libretro, new_path,
-         sizeof(g_settings.libretro));
-
-   return true;
-}
-
-void rarch_make_dir(const char *x, const char *name)
-{
-   RARCH_LOG("Checking directory name %s [%s]\n", name, x);
-   if (strlen(x) > 0)
-   {
-      if (!path_is_directory(x))
-      {
-         RARCH_WARN("Directory \"%s\" does not exists, creating\n", x);
-         if (mkdir((x), 0777) != 0)
-            RARCH_ERR("Could not create directory \"%s\"\n", x);
-      }
-   }
-}
-#endif
-
-static void rarch_get_environment(int argc, char *argv[])
-{
-   g_extern.verbose = true;
-
-#if defined(HAVE_LOGGER)
-   logger_init();
-#elif defined(HAVE_FILE_LOGGER)
-   g_extern.log_file = fopen("/retroarch-log.txt", "w");
-#endif
-
-   if (frontend_ctx && frontend_ctx->environment_get)
-      frontend_ctx->environment_get(argc, argv);
+   path_mkdir(default_paths.port_dir);
+   path_mkdir(default_paths.system_dir);
+   path_mkdir(default_paths.savestate_dir);
+   path_mkdir(default_paths.sram_dir);
 
    config_load();
 
-#if defined(RARCH_CONSOLE)
    init_libretro_sym(false);
    rarch_init_system_info();
 
    global_init_drivers();
-
-#ifdef HAVE_LIBRETRO_MANAGEMENT
-   char path_prefix[PATH_MAX];
-#if defined(_WIN32)
-   char slash = '\\';
-#else
-   char slash = '/';
-#endif
-
-   snprintf(path_prefix, sizeof(path_prefix), "%s%c", default_paths.core_dir, slash);
-
-   char core_exe_path[256];
-   snprintf(core_exe_path, sizeof(core_exe_path), "%sCORE%s", path_prefix, DEFAULT_EXE_EXT);
-
-   // Save new libretro core path to config file and exit
-   if (path_file_exists(core_exe_path))
-      if (libretro_install_core(path_prefix, core_exe_path))
-#ifdef _XBOX
-    g_extern.system.shutdown = g_extern.system.shutdown;
-#else
-	 g_extern.system.shutdown = true;
-#endif
-#endif
-
-#ifdef GEKKO
-   /* Per-core input config loading */
-   char core_name[64];
-
-   libretro_get_current_core_pathname(core_name, sizeof(core_name));
-   snprintf(g_extern.input_config_path, sizeof(g_extern.input_config_path), "%s/%s.cfg", default_paths.input_presets_dir, core_name);
-   config_read_keybinds(g_extern.input_config_path);
-#endif
-#endif
 }
-
-#if defined(IOS) || defined(OSX)
-void* rarch_main(void* args)
-#elif defined(HAVE_BB10)
-int rarch_main(int argc, char *argv[])
-#else
-int main(int argc, char *argv[])
 #endif
+
+#if defined(ANDROID)
+
+#define main_entry android_app_entry
+#define returntype void
+#define signature_expand() data
+#define returnfunc() exit(0)
+#define return_negative() return
+#define return_var(var) return
+#define declare_argc() int argc = 0;
+#define declare_argv() char *argv[1]
+#define args_initial_ptr() data
+#else
+
+#if defined(__APPLE__) || defined(HAVE_BB10)
+#define main_entry rarch_main
+#elif defined(EMSCRIPTEN)
+#define main_entry _fakemain
+#else
+#define main_entry main
+#endif
+
+#define returntype int
+#define signature_expand() argc, argv
+#define returnfunc() return 0
+#define return_negative() return 1
+#define return_var(var) return var
+#define declare_argc()
+#define declare_argv()
+#define args_initial_ptr() NULL
+
+#endif
+
+#if defined(HAVE_BB10) || defined(ANDROID)
+#define ra_preinited true
+#else
+#define ra_preinited false
+#endif
+
+#if defined(HAVE_BB10) || defined(RARCH_CONSOLE)
+#define attempt_load_game false
+#else
+#define attempt_load_game true
+#endif
+
+#if defined(RARCH_CONSOLE) || defined(HAVE_BB10) || defined(ANDROID)
+#define initial_menu_lifecycle_state (1ULL << MODE_LOAD_GAME)
+#else
+#define initial_menu_lifecycle_state (1ULL << MODE_GAME)
+#endif
+
+#if !defined(RARCH_CONSOLE) && !defined(HAVE_BB10) && !defined(ANDROID)
+#define attempt_load_game_push_history true
+#else
+#define attempt_load_game_push_history false
+#endif
+
+#ifndef RARCH_CONSOLE
+#define rarch_get_environment_console() (void)0
+#endif
+
+#if defined(RARCH_CONSOLE) || defined(__QNX__) || defined(ANDROID)
+#define attempt_load_game_fails (1ULL << MODE_MENU_PREINIT)
+#else
+#define attempt_load_game_fails (1ULL << MODE_EXIT)
+#endif
+
+#if defined(RARCH_CONSOLE) || defined(__APPLE__)
+#define load_dummy_on_core_shutdown false
+#else
+#define load_dummy_on_core_shutdown true
+#endif
+
+#define frontend_init_enable true
+#define menu_init_enable true
+#define initial_lifecycle_state_preinit false
+
+int main_entry_iterate(signature(), args_type() args)
 {
-   frontend_ctx = (frontend_ctx_driver_t*)frontend_ctx_init_first();
+   int i;
+   static retro_keyboard_event_t key_event;
 
-   if (frontend_ctx && frontend_ctx->init)
-      frontend_ctx->init();
-
-#ifndef HAVE_BB10
-   rarch_main_clear_state();
-#endif
-
-#ifndef __APPLE__
-   rarch_get_environment(argc, argv);
-#endif
-
-#if !defined(RARCH_CONSOLE) && !defined(HAVE_BB10)
-#if defined(__APPLE__)
-   struct rarch_main_wrap* argdata = (struct rarch_main_wrap*)args;
-   int init_ret = rarch_main_init_wrap(argdata);
-   apple_free_main_wrap(argdata);
-
-   if (init_ret)
+   if (g_extern.system.shutdown)
    {
-      rarch_main_clear_state();
-      dispatch_async_f(dispatch_get_main_queue(), (void*)1, apple_rarch_exited);
-      return 0;
+#ifdef HAVE_MENU
+      // Load dummy core instead of exiting RetroArch completely.
+      if (load_dummy_on_core_shutdown)
+         load_menu_game_prepare_dummy();
+      else
+#endif
+         return 1;
    }
-#else
-   rarch_init_msg_queue();
-   int init_ret;
-   if ((init_ret = rarch_main_init(argc, argv))) return init_ret;
-#endif
-#endif
-
-#if defined(HAVE_MENU) || defined(HAVE_BB10)
-   menu_init();
-
-#ifndef __APPLE__
-   if (frontend_ctx && frontend_ctx->process_args)
-      frontend_ctx->process_args(argc, argv);
-#endif
-
-#if defined(RARCH_CONSOLE) || defined(HAVE_BB10)
-   g_extern.lifecycle_mode_state |= 1ULL << MODE_LOAD_GAME;
-#else
-   g_extern.lifecycle_mode_state |= 1ULL << MODE_GAME;
-#endif
-
-#if !defined(RARCH_CONSOLE) && !defined(HAVE_BB10)
-   // If we started a ROM directly from command line,
-   // push it to ROM history.
-   if (!g_extern.libretro_dummy)
-      menu_rom_history_push_current();
-#endif
-
-   for (;;)
+   else if (g_extern.lifecycle_state & (1ULL << MODE_CLEAR_INPUT))
    {
-      if (g_extern.system.shutdown)
-         break;
-      else if (g_extern.lifecycle_mode_state & (1ULL << MODE_LOAD_GAME))
+      rarch_input_poll();
+      if (!menu_input())
       {
-         load_menu_game_prepare();
+         // Restore libretro keyboard callback.
+         g_extern.system.key_event = key_event;
 
+         g_extern.lifecycle_state &= ~(1ULL << MODE_CLEAR_INPUT);
+      }
+   }
+   else if (g_extern.lifecycle_state & (1ULL << MODE_LOAD_GAME))
+   {
+      load_menu_game_prepare();
+
+      if (load_menu_game())
+      {
+         g_extern.lifecycle_state |= (1ULL << MODE_GAME);
+         if (driver.video_data && driver.video_poke && driver.video_poke->set_aspect_ratio)
+            driver.video_poke->set_aspect_ratio(driver.video_data, g_settings.video.aspect_ratio_idx);
+      }
+      else
+      {
          // If ROM load fails, we exit RetroArch. On console it might make more sense to go back to menu though ...
-         if (load_menu_game())
-            g_extern.lifecycle_mode_state |= (1ULL << MODE_GAME);
-         else
+         g_extern.lifecycle_state = attempt_load_game_fails;
+
+         if (g_extern.lifecycle_state & (1ULL << MODE_EXIT))
          {
-#if defined(RARCH_CONSOLE) || defined(__QNX__)
-            g_extern.lifecycle_mode_state |= (1ULL << MODE_MENU);
-#else
             if (frontend_ctx && frontend_ctx->shutdown)
                frontend_ctx->shutdown(true);
 
             return 1;
-#endif
          }
-
-         g_extern.lifecycle_mode_state &= ~(1ULL << MODE_LOAD_GAME);
       }
-      else if (g_extern.lifecycle_mode_state & (1ULL << MODE_GAME))
+
+      g_extern.lifecycle_state &= ~(1ULL << MODE_LOAD_GAME);
+
+   }
+   else if (g_extern.lifecycle_state & (1ULL << MODE_GAME))
+   {
+      bool r;
+      if (g_extern.is_paused && !g_extern.is_oneshot)
+         r = rarch_main_idle_iterate();
+      else
+         r = rarch_main_iterate();
+
+      if (r)
       {
-#ifdef RARCH_CONSOLE
-         driver.input->poll(NULL);
-#endif
-         if (driver.video_poke->set_aspect_ratio)
-            driver.video_poke->set_aspect_ratio(driver.video_data, g_settings.video.aspect_ratio_idx);
-
-         while ((g_extern.is_paused && !g_extern.is_oneshot) ? rarch_main_idle_iterate() : rarch_main_iterate())
-         {
-            if (frontend_ctx && frontend_ctx->process_events)
-               frontend_ctx->process_events();
-
-            if (!(g_extern.lifecycle_mode_state & (1ULL << MODE_GAME)))
-               break;
-         }
-         g_extern.lifecycle_mode_state &= ~(1ULL << MODE_GAME);
+         if (frontend_ctx && frontend_ctx->process_events)
+            frontend_ctx->process_events(args);
       }
-      else if (g_extern.lifecycle_mode_state & (1ULL << MODE_MENU))
+      else
+         g_extern.lifecycle_state &= ~(1ULL << MODE_GAME);
+   }
+#ifdef HAVE_MENU
+   else if (g_extern.lifecycle_state & (1ULL << MODE_MENU_PREINIT))
+   {
+      // Menu should always run with vsync on.
+      video_set_nonblock_state_func(false);
+      // Stop all rumbling when entering RGUI.
+      for (i = 0; i < MAX_PLAYERS; i++)
       {
-         g_extern.lifecycle_mode_state |= 1ULL << MODE_MENU_PREINIT;
-         // Menu should always run with vsync on.
-         video_set_nonblock_state_func(false);
+         driver_set_rumble_state(i, RETRO_RUMBLE_STRONG, 0);
+         driver_set_rumble_state(i, RETRO_RUMBLE_WEAK, 0);
+      }
 
-         if (driver.audio_data)
-            audio_stop_func();
+      // Override keyboard callback to redirect to menu instead.
+      // We'll use this later for something ...
+      // FIXME: This should probably be moved to menu_common somehow.
+      key_event = g_extern.system.key_event;
+      g_extern.system.key_event = menu_key_event;
 
-         while (!g_extern.system.shutdown && menu_iterate())
-         {
-            if (frontend_ctx && frontend_ctx->process_events)
-               frontend_ctx->process_events();
+      if (driver.audio_data)
+         audio_stop_func();
 
-            if (!(g_extern.lifecycle_mode_state & (1ULL << MODE_MENU)))
-               break;
-         }
+      rgui->need_refresh = true;
+      rgui->old_input_state |= 1ULL << RARCH_MENU_TOGGLE;
 
+      g_extern.lifecycle_state &= ~(1ULL << MODE_MENU_PREINIT);
+      g_extern.lifecycle_state |= (1ULL << MODE_MENU);
+   }
+   else if (g_extern.lifecycle_state & (1ULL << MODE_MENU))
+   {
+      if (menu_iterate())
+      {
+         if (frontend_ctx && frontend_ctx->process_events)
+            frontend_ctx->process_events(args);
+      }
+      else
+      {
+         g_extern.lifecycle_state &= ~(1ULL << MODE_MENU);
          driver_set_nonblock_state(driver.nonblock_state);
 
-         if (driver.audio_data && !audio_start_func())
+         if (driver.audio_data && !g_extern.audio_data.mute && !audio_start_func())
          {
             RARCH_ERR("Failed to resume audio driver. Will continue without audio.\n");
             g_extern.audio_active = false;
          }
 
-         g_extern.lifecycle_mode_state &= ~(1ULL << MODE_MENU);
-      }
-      else
-         break;
-   }
+         g_extern.lifecycle_state |= (1ULL << MODE_CLEAR_INPUT);
 
+         // If QUIT state came from command interface, we'll only see it once due to MODE_CLEAR_INPUT.
+         if (input_key_pressed_func(RARCH_QUIT_KEY) || !video_alive_func())
+            return 1;
+      }
+   }
+#endif
+   else
+      return 1;
+
+   return 0;
+}
+
+void main_exit(args_type() args)
+{
+#ifdef HAVE_MENU
    g_extern.system.shutdown = false;
+
    menu_free();
 
    if (g_extern.config_save_on_exit && *g_extern.config_path)
+   {
+      // save last core-specific config to the default config location, needed on
+      // consoles for core switching and reusing last good config for new cores.
       config_save_file(g_extern.config_path);
 
-#ifdef GEKKO
-   /* Per-core input config saving */
-   config_save_keybinds(g_extern.input_config_path);
+      // Flush out the core specific config.
+      if (*g_extern.core_specific_config_path && g_settings.core_specific_config)
+         config_save_file(g_extern.core_specific_config_path);
+   }
 #endif
 
-#ifdef RARCH_CONSOLE
-   global_uninit_drivers();
-#endif
-#else
-   while ((g_extern.is_paused && !g_extern.is_oneshot) ? rarch_main_idle_iterate() : rarch_main_iterate());
-#endif
-
-   rarch_main_deinit();
+   if (g_extern.main_is_init)
+      rarch_main_deinit();
    rarch_deinit_msg_queue();
+   global_uninit_drivers();
 
 #ifdef PERF_TEST
    rarch_perf_log();
 #endif
 
-#if defined(HAVE_LOGGER)
+#if defined(HAVE_LOGGER) && !defined(ANDROID)
    logger_shutdown();
 #elif defined(HAVE_FILE_LOGGER)
    if (g_extern.log_file)
@@ -308,9 +292,9 @@ int main(int argc, char *argv[])
 #endif
 
    if (frontend_ctx && frontend_ctx->deinit)
-      frontend_ctx->deinit();
+      frontend_ctx->deinit(args);
 
-   if (g_extern.lifecycle_mode_state & (1ULL << MODE_EXITSPAWN) && frontend_ctx
+   if (g_extern.lifecycle_state & (1ULL << MODE_EXITSPAWN) && frontend_ctx
          && frontend_ctx->exitspawn)
       frontend_ctx->exitspawn();
 
@@ -318,6 +302,64 @@ int main(int argc, char *argv[])
 
    if (frontend_ctx && frontend_ctx->shutdown)
       frontend_ctx->shutdown(false);
+}
 
-   return 0;
+returntype main_entry(signature())
+{
+   declare_argc();
+   declare_argv();
+   args_type() args = (args_type())args_initial_ptr();
+
+   if (frontend_init_enable)
+   {
+      frontend_ctx = (frontend_ctx_driver_t*)frontend_ctx_init_first();
+
+      if (frontend_ctx && frontend_ctx->init)
+         frontend_ctx->init(args);
+   }
+
+   if (!ra_preinited)
+   {
+      rarch_main_clear_state();
+      rarch_init_msg_queue();
+   }
+
+   if (frontend_ctx && frontend_ctx->environment_get)
+   {
+      frontend_ctx->environment_get(argc, argv, args);
+      rarch_get_environment_console();
+   }
+
+   if (attempt_load_game)
+   {
+      int init_ret;
+      if ((init_ret = rarch_main_init(argc, argv))) return_var(init_ret);
+   }
+
+#if defined(HAVE_MENU)
+   if (menu_init_enable)
+      menu_init();
+
+   if (frontend_ctx && frontend_ctx->process_args)
+      frontend_ctx->process_args(argc, argv, args);
+
+   if (!initial_lifecycle_state_preinit)
+      g_extern.lifecycle_state |= initial_menu_lifecycle_state;
+
+   if (attempt_load_game_push_history)
+   {
+      // If we started a ROM directly from command line,
+      // push it to ROM history.
+      if (!g_extern.libretro_dummy)
+         menu_rom_history_push_current();
+   }
+
+   while (!main_entry_iterate(signature_expand(), args));
+#else
+   while ((g_extern.is_paused && !g_extern.is_oneshot) ? rarch_main_idle_iterate() : rarch_main_iterate());
+#endif
+
+   main_exit(args);
+
+   returnfunc();
 }

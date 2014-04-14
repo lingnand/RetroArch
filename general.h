@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -18,12 +19,11 @@
 
 #include "boolean.h"
 #include <stdio.h>
-#include <time.h>
 #include <limits.h>
 #include <setjmp.h>
 #include "driver.h"
 #include "record/ffemu.h"
-#include "message.h"
+#include "message_queue.h"
 #include "rewind.h"
 #include "movie.h"
 #include "autosave.h"
@@ -33,6 +33,7 @@
 #include "compat/strl.h"
 #include "performance.h"
 #include "core_options.h"
+#include "miscellaneous.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -41,24 +42,13 @@
 #ifndef PACKAGE_VERSION
 #ifdef __QNX__
 /* FIXME - avoid too many decimal points in number error */
-#define PACKAGE_VERSION "0994"
+#define PACKAGE_VERSION "1002"
 #else
-#define PACKAGE_VERSION "0.9.9.4"
+#define PACKAGE_VERSION "1.0.0.2"
 #endif
 #endif
 
 // Platform-specific headers
-// PS3
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
-#include <sys/timer.h>
-#include "ps3/ps3_input.h"
-#endif
-
-// libxenon
-#ifdef XENON
-#include <time/time.h>
-#endif
-
 // Windows
 #ifdef _WIN32
 #ifdef _XBOX
@@ -81,14 +71,6 @@
 #endif
 //////////////
 
-// Some platforms do not set this value.
-// Just assume a value. It's usually 4KiB.
-// Platforms with a known value (like Win32)
-// set this value explicitly in platform specific headers.
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
-
 #ifdef HAVE_NETPLAY
 #include "netplay.h"
 #endif
@@ -110,12 +92,10 @@ enum menu_enums
    MODE_GAME = 0,
    MODE_LOAD_GAME,
    MODE_MENU,
+   MODE_EXIT,
    MODE_MENU_WIDESCREEN,
    MODE_MENU_HD,
    MODE_MENU_PREINIT,
-   MODE_MENU_INGAME_EXIT,
-   MODE_INFO_DRAW,
-   MODE_FPS_DRAW,
    MODE_EXTLAUNCH_MULTIMAN,
    MODE_EXITSPAWN,
    MODE_EXITSPAWN_START_GAME,
@@ -129,6 +109,7 @@ enum menu_enums
    MODE_AUDIO_CUSTOM_BGM_ENABLE,
    MODE_OSK_ENTRY_SUCCESS,
    MODE_OSK_ENTRY_FAIL,
+   MODE_CLEAR_INPUT,
 };
 
 enum sound_mode_enums
@@ -159,6 +140,8 @@ struct settings
       unsigned fullscreen_y;
       bool vsync;
       bool hard_sync;
+      bool black_frame_insertion;
+      unsigned swap_interval;
       unsigned hard_sync_frames;
       bool smooth;
       bool force_aspect;
@@ -167,6 +150,7 @@ struct settings
       bool aspect_ratio_auto;
       bool scale_integer;
       unsigned aspect_ratio_idx;
+      unsigned rotation;
 
       char shader_path[PATH_MAX];
       bool shader_enable;
@@ -196,11 +180,48 @@ struct settings
       bool allow_rotate;
    } video;
 
+#ifdef HAVE_MENU
+   struct 
+   {
+      char driver[32];
+   } menu;
+#endif
+
+#ifdef HAVE_CAMERA
+   struct
+   {
+      char driver[32];
+      char device[PATH_MAX];
+      bool allow;
+      unsigned width;
+      unsigned height;
+   } camera;
+#endif
+
+#ifdef HAVE_LOCATION
+   struct
+   {
+      char driver[32];
+      bool allow;
+      int update_interval_ms;
+      int update_interval_distance;
+   } location;
+#endif
+
+#ifdef HAVE_OSK
+   struct
+   {
+      char driver[32];
+      bool enable;
+   } osk;
+#endif
+
    struct
    {
       char driver[32];
       bool enable;
       unsigned out_rate;
+      unsigned block_frames;
       float in_rate;
       char device[PATH_MAX];
       unsigned latency;
@@ -218,17 +239,23 @@ struct settings
    {
       char driver[32];
       char joypad_driver[32];
+      char keyboard_layout[64];
       struct retro_keybind binds[MAX_PLAYERS][RARCH_BIND_LIST_END];
+#ifdef RARCH_CONSOLE
+      struct retro_keybind menu_binds[RARCH_BIND_LIST_END];
+#endif
 
       // Set by autoconfiguration in joypad_autoconfig_dir. Does not override main binds.
       struct retro_keybind autoconf_binds[MAX_PLAYERS][RARCH_BIND_LIST_END];
       bool autoconfigured[MAX_PLAYERS];
 
+      unsigned libretro_device[MAX_PLAYERS];
+      unsigned analog_dpad_mode[MAX_PLAYERS];
+
       float axis_threshold;
       int joypad_map[MAX_PLAYERS];
       unsigned device[MAX_PLAYERS];
       char device_names[MAX_PLAYERS][64];
-      unsigned dpad_emulation[MAX_PLAYERS];
       bool debug_enable;
       bool autodetect_enable;
 #ifdef ANDROID
@@ -253,17 +280,22 @@ struct settings
    unsigned game_history_size;
 
    char libretro[PATH_MAX];
+   unsigned libretro_log_level;
+   char libretro_info_path[PATH_MAX];
    char cheat_database[PATH_MAX];
    char cheat_settings_path[PATH_MAX];
 
    char screenshot_directory[PATH_MAX];
    char system_directory[PATH_MAX];
 
+   char extraction_directory[PATH_MAX];
+
    bool rewind_enable;
    size_t rewind_buffer_size;
    unsigned rewind_granularity;
 
    float slowmotion_ratio;
+   float fastforward_ratio;
 
    bool pause_nonactive;
    unsigned autosave_interval;
@@ -277,18 +309,15 @@ struct settings
    uint16_t network_cmd_port;
    bool stdin_cmd_enable;
 
-#if defined(HAVE_RGUI) || defined(HAVE_RMENU)
-   char rgui_browser_directory[PATH_MAX];
+   char content_directory[PATH_MAX];
+#if defined(HAVE_MENU)
+   char rgui_content_directory[PATH_MAX];
+   char rgui_config_directory[PATH_MAX];
+   bool rgui_show_start_screen;
 #endif
-};
+   bool fps_show;
 
-enum rarch_game_type
-{
-   RARCH_CART_NORMAL = 0,
-   RARCH_CART_SGB,
-   RARCH_CART_BSX,
-   RARCH_CART_BSX_SLOTTED,
-   RARCH_CART_SUFAMI
+   bool core_specific_config;
 };
 
 typedef struct rarch_resolution
@@ -313,13 +342,19 @@ struct global
    bool verbose;
    bool audio_active;
    bool video_active;
+#ifdef HAVE_CAMERA
+   bool camera_active;
+#endif
+#ifdef HAVE_LOCATION
+   bool location_active;
+#endif
+#ifdef HAVE_OSK
+   bool osk_active;
+#endif
    bool force_fullscreen;
 
-   unsigned libretro_device[MAX_PLAYERS];
+   struct string_list *temporary_roms;
 
-   bool rom_file_temporary;
-   char last_rom[PATH_MAX];
-   enum rarch_game_type game_type;
    uint32_t cart_crc;
 
    char gb_rom_path[PATH_MAX];
@@ -327,10 +362,14 @@ struct global
    char sufami_rom_path[2][PATH_MAX];
    bool has_set_save_path;
    bool has_set_state_path;
+   bool has_set_libretro_device[MAX_PLAYERS];
+   bool has_set_libretro;
 
 #ifdef HAVE_RMENU
    char menu_texture_path[PATH_MAX];
 #endif
+
+   // Config associated with global "default" config.
    char config_path[PATH_MAX];
    char append_config_path[PATH_MAX];
    char input_config_path[PATH_MAX];
@@ -341,13 +380,16 @@ struct global
    
    char basename[PATH_MAX];
    char fullpath[PATH_MAX];
-   char savefile_name_srm[PATH_MAX];
-   char savefile_name_rtc[PATH_MAX]; // Make sure that fill_pathname has space.
-   char savefile_name_psrm[PATH_MAX];
-   char savefile_name_asrm[PATH_MAX];
-   char savefile_name_bsrm[PATH_MAX];
+
+   // A list of save types and associated paths for all ROMs.
+   struct string_list *savefiles;
+
+   // For --subsystem ROMs.
+   char subsystem[256];
+   struct string_list *subsystem_fullpaths;
+
+   char savefile_name[PATH_MAX];
    char savestate_name[PATH_MAX];
-   char xml_name[PATH_MAX];
 
    // Used on reentrancy to use a savestate dir.
    char savefile_dir[PATH_MAX];
@@ -365,7 +407,13 @@ struct global
    char bps_name[PATH_MAX];
    char ips_name[PATH_MAX];
 
-   unsigned state_slot;
+   int state_slot;
+
+   struct
+   {
+      retro_time_t minimum_frame_time;
+      retro_time_t last_frame_time;
+   } frame_limit;
 
    struct
    {
@@ -387,10 +435,23 @@ struct global
       
       retro_keyboard_event_t key_event;
 
+      struct retro_audio_callback audio_callback;
+
       struct retro_disk_control_callback disk_control; 
       struct retro_hw_render_callback hw_render_callback;
+      struct retro_camera_callback camera_callback;
+      struct retro_location_callback location_callback;
+
+      struct retro_frame_time_callback frame_time;
+      retro_usec_t frame_time_last;
 
       core_option_manager_t *core_options;
+
+      struct retro_subsystem_info *special;
+      unsigned num_special;
+
+      struct retro_controller_info *ports;
+      unsigned num_ports;
    } system;
 
    struct
@@ -427,7 +488,6 @@ struct global
 
       float volume_db;
       float volume_gain;
-
    } audio_data;
 
    struct
@@ -437,7 +497,7 @@ struct global
       uint64_t buffer_free_samples_count;
 
 #define MEASURE_FRAME_TIME_SAMPLES_COUNT (2 * 1024)
-      rarch_time_t frame_time_samples[MEASURE_FRAME_TIME_SAMPLES_COUNT];
+      retro_time_t frame_time_samples[MEASURE_FRAME_TIME_SAMPLES_COUNT];
       uint64_t frame_time_samples_count;
    } measure_data;
 
@@ -461,9 +521,10 @@ struct global
 
    msg_queue_t *msg_queue;
 
+   bool exec;
+
    // Rewind support.
    state_manager_t *state_manager;
-   void *state_buf;
    size_t state_size;
    bool frame_is_reverse;
 
@@ -483,6 +544,14 @@ struct global
    } bsv;
 #endif
 
+#ifdef HAVE_OSK
+   struct
+   {
+      bool (*cb_init)(void *data);
+      bool (*cb_callback)(void *data);
+   } osk;
+#endif
+
    bool sram_load_disable;
    bool sram_save_disable;
    bool use_sram;
@@ -498,7 +567,8 @@ struct global
    unsigned turbo_count;
 
    // Autosave support.
-   autosave_t *autosave[2];
+   autosave_t **autosave;
+   unsigned num_autosave;
 
    // Netplay.
 #ifdef HAVE_NETPLAY
@@ -569,7 +639,6 @@ struct global
             rarch_viewport_t custom_vp;
          } viewports;
 
-         unsigned orientation;
          unsigned gamma_correction;
          unsigned char flicker_filter_index;
          unsigned char soft_filter_index;
@@ -579,15 +648,13 @@ struct global
       struct
       {
          unsigned mode;
-#ifdef _XBOX1
+#ifdef RARCH_CONSOLE
          unsigned volume_level;
 #endif
       } sound;
    } console;
 
    uint64_t lifecycle_state;
-   uint64_t lifecycle_mode_state;
-
 
    // If this is non-NULL. RARCH_LOG and friends will write to this file.
    FILE *log_file;
@@ -601,6 +668,9 @@ struct global
 
    bool libretro_no_rom;
    bool libretro_dummy;
+
+   // Config file associated with per-core configs.
+   char core_specific_config_path[PATH_MAX];
 };
 
 struct rarch_main_wrap
@@ -614,63 +684,31 @@ struct rarch_main_wrap
    bool no_rom;
 };
 
-enum
-{
-   S_ASPECT_RATIO_DECREMENT = 0,
-   S_ASPECT_RATIO_INCREMENT,
-   S_SCALE_INTEGER_TOGGLE,
-   S_AUDIO_MUTE,
-   S_AUDIO_CONTROL_RATE_DECREMENT,
-   S_AUDIO_CONTROL_RATE_INCREMENT,
-   S_FRAME_ADVANCE,
-   S_HW_TEXTURE_FILTER,
-   S_RESOLUTION_PREVIOUS,
-   S_RESOLUTION_NEXT,
-   S_ROTATION_DECREMENT,
-   S_ROTATION_INCREMENT,
-   S_REWIND,
-   S_SAVESTATE_DECREMENT,
-   S_SAVESTATE_INCREMENT,
-   S_TRIPLE_BUFFERING,
-   S_REFRESH_RATE_DECREMENT,
-   S_REFRESH_RATE_INCREMENT,
-   S_INFO_DEBUG_MSG_TOGGLE,
-   S_INFO_MSG_TOGGLE,
-   S_DEF_ASPECT_RATIO,
-   S_DEF_SCALE_INTEGER,
-   S_DEF_AUDIO_MUTE,
-   S_DEF_AUDIO_CONTROL_RATE,
-   S_DEF_HW_TEXTURE_FILTER,
-   S_DEF_ROTATION,
-   S_DEF_TRIPLE_BUFFERING,
-   S_DEF_SAVE_STATE,
-   S_DEF_REFRESH_RATE,
-   S_DEF_INFO_DEBUG_MSG,
-   S_DEF_INFO_MSG,
-};
-
 // Public functions
 void config_load(void);
 void config_set_defaults(void);
+#ifdef HAVE_CAMERA
+const char *config_get_default_camera(void);
+#endif
+#ifdef HAVE_LOCATION
+const char *config_get_default_location(void);
+#endif
+#ifdef HAVE_OSK
+const char *config_get_default_osk(void);
+#endif
 const char *config_get_default_video(void);
 const char *config_get_default_audio(void);
 const char *config_get_default_input(void);
-void settings_set(uint64_t settings);
 
 #include "conf/config_file.h"
-bool config_load_file(const char *path);
+bool config_load_file(const char *path, bool set_defaults);
 bool config_save_file(const char *path);
 bool config_read_keybinds(const char *path);
-bool config_save_keybinds(const char *path);
 
 void rarch_game_reset(void);
 void rarch_main_clear_state(void);
 void rarch_init_system_info(void);
-#ifdef __APPLE__
-void * rarch_main(void *args);
-#else
 int rarch_main(int argc, char *argv[]);
-#endif
 int rarch_main_init_wrap(const struct rarch_main_wrap *args);
 int rarch_main_init(int argc, char *argv[]);
 bool rarch_main_idle_iterate(void);
@@ -681,20 +719,27 @@ void rarch_init_msg_queue(void);
 void rarch_deinit_msg_queue(void);
 void rarch_input_poll(void);
 void rarch_check_overlay(void);
+void rarch_check_block_hotkey(void);
 void rarch_init_rewind(void);
 void rarch_deinit_rewind(void);
 void rarch_set_fullscreen(bool fullscreen);
+bool rarch_check_fullscreen(void);
 void rarch_disk_control_set_eject(bool state, bool log);
 void rarch_disk_control_set_index(unsigned index);
 void rarch_disk_control_append_image(const char *path);
+bool rarch_set_rumble_state(unsigned port, enum retro_rumble_effect effect, bool enable);
 void rarch_init_autosave(void);
 void rarch_deinit_autosave(void);
 void rarch_take_screenshot(void);
-
 void rarch_load_state(void);
 void rarch_save_state(void);
 void rarch_state_slot_increase(void);
 void rarch_state_slot_decrease(void);
+
+#ifdef HAVE_FFMPEG
+void rarch_init_recording(void);
+void rarch_deinit_recording(void);
+#endif
 /////////
 
 // Public data structures
@@ -706,113 +751,10 @@ extern struct global g_extern;
 }
 #endif
 
-#include "retroarch_logger.h"
-
-#ifndef max
-#define max(a, b) ((a) > (b) ? (a) : (b))
-#endif
-
-#ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define RARCH_SCALE_BASE 256
-
-static inline uint32_t next_pow2(uint32_t v)
-{
-   v--;
-   v |= v >> 1;
-   v |= v >> 2;
-   v |= v >> 4;
-   v |= v >> 8;
-   v |= v >> 16;
-   v++;
-   return v;
-}
-
-static inline uint32_t prev_pow2(uint32_t v)
-{
-   v |= v >> 1;
-   v |= v >> 2;
-   v |= v >> 4;
-   v |= v >> 8;
-   v |= v >> 16;
-   return v - (v >> 1);
-}
-
-static inline uint8_t is_little_endian(void)
-{
-   union
-   {
-      uint16_t x;
-      uint8_t y[2];
-   } u;
-
-   u.x = 1;
-   return u.y[0];
-}
-
-static inline uint32_t swap_if_big32(uint32_t val)
-{
-   if (is_little_endian()) // Little-endian
-      return val;
-   else
-      return (val >> 24) | ((val >> 8) & 0xFF00) | ((val << 8) & 0xFF0000) | (val << 24);
-}
-
-static inline uint32_t swap_if_little32(uint32_t val)
-{
-   if (is_little_endian())
-      return (val >> 24) | ((val >> 8) & 0xFF00) | ((val << 8) & 0xFF0000) | (val << 24);
-   else
-      return val;
-}
-
-static inline uint16_t swap_if_big16(uint16_t val)
-{
-   if (is_little_endian())
-      return val;
-   else
-      return (val >> 8) | (val << 8);
-}
-
-static inline uint16_t swap_if_little16(uint16_t val)
-{
-   if (is_little_endian())
-      return (val >> 8) | (val << 8);
-   else
-      return val;
-}
-
 static inline float db_to_gain(float db)
 {
    return powf(10.0f, db / 20.0f);
 }
-
-static inline void rarch_sleep(unsigned msec)
-{
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
-   sys_timer_usleep(1000 * msec);
-#elif defined(PSP)
-   sceKernelDelayThread(1000 * msec);
-#elif defined(_WIN32)
-   Sleep(msec);
-#elif defined(XENON)
-   udelay(1000 * msec);
-#elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
-   usleep(1000 * msec);
-#else
-   struct timespec tv = {0};
-   tv.tv_sec = msec / 1000;
-   tv.tv_nsec = (msec % 1000) * 1000000;
-   nanosleep(&tv, NULL);
-#endif
-}
-
-#define rarch_assert(cond) do { \
-   if (!(cond)) { RARCH_ERR("Assertion failed at %s:%d.\n", __FILE__, __LINE__); exit(2); } \
-} while(0)
 
 static inline void rarch_fail(int error_code, const char *error)
 {
@@ -823,18 +765,6 @@ static inline void rarch_fail(int error_code, const char *error)
    strlcpy(g_extern.error_string, error, sizeof(g_extern.error_string));
    longjmp(g_extern.error_sjlj_context, error_code);
 }
-
-// Helper macros and struct to keep track of many booleans.
-// To check for multiple bits, use &&, not &.
-// For OR, | can be used.
-typedef struct
-{
-   uint32_t data[8];
-} rarch_bits_t;
-#define BIT_SET(a, bit)   ((a).data[(bit) >> 5] |= 1 << ((bit) & 31))
-#define BIT_CLEAR(a, bit) ((a).data[(bit) >> 5] &= ~(1 << ((bit) & 31)))
-#define BIT_GET(a, bit)   ((a).data[(bit) >> 5] & (1 << ((bit) & 31)))
-#define BIT_CLEAR_ALL(a)  memset(&(a), 0, sizeof(a));
 
 #endif
 

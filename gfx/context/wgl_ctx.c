@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -25,7 +25,7 @@
 #include "../gfx_context.h"
 #include "../gl_common.h"
 #include "../gfx_common.h"
-#include "../../media/resource.h"
+#include "win32_common.h"
 #include <windows.h>
 #include <commdlg.h>
 #include <string.h>
@@ -39,6 +39,8 @@ static HDC g_hdc;
 static HMONITOR g_last_hm;
 static HMONITOR g_all_hms[MAX_MONITORS];
 static unsigned g_num_mons;
+static unsigned g_major;
+static unsigned g_minor;
 
 static bool g_quit;
 static bool g_inited;
@@ -53,10 +55,12 @@ static bool g_resized;
 static bool g_restore_desktop;
 
 static void monitor_info(MONITORINFOEX *mon, HMONITOR *hm_to_use);
-static void gfx_ctx_get_video_size(unsigned *width, unsigned *height);
-static void gfx_ctx_destroy(void);
+static void gfx_ctx_destroy(void *data);
 
 static BOOL (APIENTRY *p_swap_interval)(int);
+
+typedef HGLRC (APIENTRY *wglCreateContextAttribsProc)(HDC, HGLRC, const int*);
+static wglCreateContextAttribsProc pcreate_context;
 
 static void setup_pixel_format(HDC hdc)
 {
@@ -78,7 +82,14 @@ static void create_gl_context(HWND hwnd)
    g_hdc = GetDC(hwnd);
    setup_pixel_format(g_hdc);
 
-   g_hrc = wglCreateContext(g_hdc);
+   if (!g_hrc)
+      g_hrc = wglCreateContext(g_hdc);
+   else
+   {
+      RARCH_LOG("[WGL]: Using cached GL context.\n");
+      driver.video_cache_context_ack = true;
+   }
+
    if (g_hrc)
    {
       if (wglMakeCurrent(g_hdc, g_hrc))
@@ -87,27 +98,89 @@ static void create_gl_context(HWND hwnd)
          g_quit = true;
    }
    else
+   {
       g_quit = true;
+      return;
+   }
+
+#ifdef GL_DEBUG
+   bool debug = true;
+#else
+   bool debug = g_extern.system.hw_render_callback.debug_context;
+#endif
+
+   bool core_context = (g_major * 1000 + g_minor) >= 3001;
+
+   if (core_context || debug)
+   {
+#ifndef WGL_CONTEXT_MAJOR_VERSION_ARB
+#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+#endif
+#ifndef WGL_CONTEXT_MINOR_VERSION_ARB
+#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+#endif
+#ifndef WGL_CONTEXT_PROFILE_MASK_ARB
+#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
+#endif
+#ifndef WGL_CONTEXT_CORE_PROFILE_BIT_ARB
+#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x0001
+#endif
+#ifndef WGL_CONTEXT_FLAGS_ARB
+#define WGL_CONTEXT_FLAGS_ARB 0x2094
+#endif
+#ifndef WGL_CONTEXT_DEBUG_BIT_ARB
+#define WGL_CONTEXT_DEBUG_BIT_ARB 0x0001
+#endif
+      int attribs[16];
+      int *aptr = attribs;
+
+      if (core_context)
+      {
+         *aptr++ = WGL_CONTEXT_MAJOR_VERSION_ARB;
+         *aptr++ = g_major;
+         *aptr++ = WGL_CONTEXT_MINOR_VERSION_ARB;
+         *aptr++ = g_minor;
+         *aptr++ = WGL_CONTEXT_PROFILE_MASK_ARB;
+         *aptr++ = WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
+      }
+
+      if (debug)
+      {
+         *aptr++ = WGL_CONTEXT_FLAGS_ARB;
+         *aptr++ = WGL_CONTEXT_DEBUG_BIT_ARB;
+      }
+
+      *aptr = 0;
+
+      if (!pcreate_context)
+         pcreate_context = (wglCreateContextAttribsProc)wglGetProcAddress("wglCreateContextAttribsARB");
+
+      if (pcreate_context)
+      {
+         HGLRC context = pcreate_context(g_hdc, NULL, attribs);
+
+         if (context)
+         {
+            wglMakeCurrent(NULL, NULL);
+            wglDeleteContext(g_hrc);
+            g_hrc = context;
+            if (!wglMakeCurrent(g_hdc, g_hrc))
+               g_quit = true;
+         }
+         else
+            RARCH_ERR("[WGL]: Failed to create core context. Falling back to legacy context.\n");
+      }
+      else
+         RARCH_ERR("[WGL]: wglCreateContextAttribsARB not supported.\n");
+   }
 }
 
-static bool BrowseForFile(char *filename)
-{
-   OPENFILENAME ofn;
-	memset((void *)&ofn, 0, sizeof(OPENFILENAME));
+#ifdef __cplusplus
+extern "C"
+#endif
+bool dinput_handle_message(void *dinput, UINT message, WPARAM wParam, LPARAM lParam);
 
-	ofn.lStructSize = sizeof(OPENFILENAME);
-	ofn.hwndOwner = g_hwnd;
-	ofn.lpstrFilter = "All Files\0*.*\0\0";
-	ofn.lpstrFile = filename;
-	ofn.lpstrTitle = "Select ROM";
-	ofn.lpstrDefExt = "";
-	ofn.nMaxFile = PATH_MAX;
-	ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
-	if(GetOpenFileName(&ofn)) {
-		return true;
-	}
-   return false;
-}
+static void *dinput;
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
       WPARAM wparam, LPARAM lparam)
@@ -124,15 +197,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
          }
          break;
 
+      case WM_CHAR:
+      case WM_KEYDOWN:
+      case WM_KEYUP:
+      case WM_SYSKEYUP:
       case WM_SYSKEYDOWN:
-         switch (wparam)
-         {
-            case VK_F10:
-            case VK_MENU:
-            case VK_RSHIFT:
-               return 0;
-         }
-         break;
+         return win32_handle_keyboard_event(hwnd, message, wparam, lparam);
 
       case WM_CREATE:
          create_gl_context(hwnd);
@@ -159,35 +229,15 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
             g_resized = true;
          }
          return 0;
-      case WM_COMMAND:
-         switch(wparam & 0xffff)
-         {
-            case ID_M_OPENROM:
-            {
-               char rom_file[PATH_MAX] = {0};
-               if(BrowseForFile(rom_file))
-               {
-                  strlcpy(g_extern.fullpath, rom_file, sizeof(g_extern.fullpath));
-                  g_extern.lifecycle_mode_state |= (1ULL << MODE_LOAD_GAME);
-                  PostMessage(g_hwnd, WM_CLOSE, 0, 0);
-               }
-            }
-            break;
-            case ID_M_RESET:
-               rarch_game_reset();
-               break;
-            case ID_M_QUIT:
-               PostMessage(g_hwnd, WM_CLOSE, 0, 0);
-               break;
-         }
-         break;
    }
-
+   if (dinput_handle_message(dinput, message, wparam, lparam))
+      return 0;
    return DefWindowProc(hwnd, message, wparam, lparam);
 }
 
-static void gfx_ctx_swap_interval(unsigned interval)
+static void gfx_ctx_swap_interval(void *data, unsigned interval)
 {
+   (void)data;
    g_interval = interval;
 
    if (g_hrc && p_swap_interval)
@@ -198,9 +248,10 @@ static void gfx_ctx_swap_interval(unsigned interval)
    }
 }
 
-static void gfx_ctx_check_window(bool *quit,
+static void gfx_ctx_check_window(void *data, bool *quit,
       bool *resize, unsigned *width, unsigned *height, unsigned frame_count)
 {
+   (void)data;
    (void)frame_count;
 
    MSG msg;
@@ -220,26 +271,34 @@ static void gfx_ctx_check_window(bool *quit,
    }
 }
 
-static void gfx_ctx_swap_buffers(void)
+static void gfx_ctx_swap_buffers(void *data)
 {
+   (void)data;
    SwapBuffers(g_hdc);
 }
 
-static void gfx_ctx_set_resize(unsigned width, unsigned height)
+static void gfx_ctx_set_resize(void *data, unsigned width, unsigned height)
 {
+   (void)data;
    (void)width;
    (void)height;
 }
 
-static void gfx_ctx_update_window_title(void)
+static void gfx_ctx_update_window_title(void *data)
 {
-   char buf[128];
-   if (gfx_get_fps(buf, sizeof(buf), false))
+   (void)data;
+   char buf[128], buf_fps[128];
+   bool fps_draw = g_settings.fps_show;
+   if (gfx_get_fps(buf, sizeof(buf), fps_draw ? buf_fps : NULL, sizeof(buf_fps)))
       SetWindowText(g_hwnd, buf);
+
+   if (fps_draw)
+      msg_queue_push(g_extern.msg_queue, buf_fps, 1, 1);
 }
 
-static void gfx_ctx_get_video_size(unsigned *width, unsigned *height)
+static void gfx_ctx_get_video_size(void *data, unsigned *width, unsigned *height)
 {
+   (void)data;
    if (!g_hwnd)
    {
       HMONITOR hm_to_use = NULL;
@@ -263,8 +322,9 @@ static BOOL CALLBACK monitor_enum_proc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT
    return TRUE;
 }
 
-static bool gfx_ctx_init(void)
+static bool gfx_ctx_init(void *data)
 {
+   (void)data;
    if (g_inited)
       return false;
 
@@ -326,7 +386,7 @@ static void monitor_info(MONITORINFOEX *mon, HMONITOR *hm_to_use)
    GetMonitorInfo(*hm_to_use, (MONITORINFO*)mon);
 }
 
-static bool gfx_ctx_set_video_mode(
+static bool gfx_ctx_set_video_mode(void *data,
       unsigned width, unsigned height,
       bool fullscreen)
 {
@@ -383,15 +443,6 @@ static bool gfx_ctx_set_video_mode(
    if (!g_hwnd)
       goto error;
 
-   if(!fullscreen)
-   {
-      SetMenu(g_hwnd,LoadMenu(GetModuleHandle(NULL),MAKEINTRESOURCE(IDR_MENU)));
-      RECT rcTemp = {0, 0, g_resize_height, 0x7FFF}; // 0x7FFF="Infinite" height
-      SendMessage(g_hwnd, WM_NCCALCSIZE, FALSE, (LPARAM)&rcTemp); // recalculate margin, taking possible menu wrap into account
-      g_resize_height += rcTemp.top + rect.top; // extend by new top margin and substract previous margin
-      SetWindowPos(g_hwnd, NULL, 0, 0, g_resize_width, g_resize_height, SWP_NOMOVE);
-   }
-
    if (!fullscreen || windowed_full)
    {
       ShowWindow(g_hwnd, SW_RESTORE);
@@ -415,7 +466,7 @@ static bool gfx_ctx_set_video_mode(
 
    p_swap_interval = (BOOL (APIENTRY *)(int))wglGetProcAddress("wglSwapIntervalEXT");
 
-   gfx_ctx_swap_interval(g_interval);
+   gfx_ctx_swap_interval(data, g_interval);
 
    driver.display_type  = RARCH_DISPLAY_WIN32;
    driver.video_display = 0;
@@ -424,17 +475,23 @@ static bool gfx_ctx_set_video_mode(
    return true;
 
 error:
-   gfx_ctx_destroy();
+   gfx_ctx_destroy(data);
    return false;
 }
 
-static void gfx_ctx_destroy(void)
+static void gfx_ctx_destroy(void *data)
 {
+   (void)data;
    if (g_hrc)
    {
+      glFinish();
       wglMakeCurrent(NULL, NULL);
-      wglDeleteContext(g_hrc);
-      g_hrc = NULL;
+
+      if (!driver.video_cache_context)
+      {
+         wglDeleteContext(g_hrc);
+         g_hrc = NULL;
+      }
    }
 
    if (g_hwnd && g_hdc)
@@ -462,17 +519,21 @@ static void gfx_ctx_destroy(void)
    }
 
    g_inited = false;
+   g_major = g_minor = 0;
+   p_swap_interval = NULL;
 }
 
-static void gfx_ctx_input_driver(const input_driver_t **input, void **input_data)
+static void gfx_ctx_input_driver(void *data, const input_driver_t **input, void **input_data)
 {
-   void *dinput = input_dinput.init();
+   (void)data;
+   dinput = input_dinput.init();
    *input       = dinput ? &input_dinput : NULL;
    *input_data  = dinput;
 }
 
-static bool gfx_ctx_has_focus(void)
+static bool gfx_ctx_has_focus(void *data)
 {
+   (void)data;
    if (!g_inited)
       return false;
 
@@ -484,13 +545,17 @@ static gfx_ctx_proc_t gfx_ctx_get_proc_address(const char *symbol)
    return (gfx_ctx_proc_t)wglGetProcAddress(symbol);
 }
 
-static bool gfx_ctx_bind_api(enum gfx_ctx_api api)
+static bool gfx_ctx_bind_api(void *data, enum gfx_ctx_api api, unsigned major, unsigned minor)
 {
+   (void)data;
+   g_major = major;
+   g_minor = minor;
    return api == GFX_CTX_OPENGL_API;
 }
 
-static void gfx_ctx_show_mouse(bool state)
+static void gfx_ctx_show_mouse(void *data, bool state)
 {
+   (void)data;
    show_cursor(state);
 }
 

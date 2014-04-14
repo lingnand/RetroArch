@@ -83,7 +83,7 @@ do_build()
    BUILDTYPE="$3"
 
    if [ ! -d "$RetroArch_DIR" ]; then
-      git clone git://github.com/Themaister/RetroArch.git "$RetroArch_DIR"
+      git clone git://github.com/libretro/RetroArch.git "$RetroArch_DIR"
       cd "$RetroArch_DIR"
    else
       cd "$RetroArch_DIR"
@@ -131,8 +131,8 @@ do_build()
 
 if [ "$BUILD_32BIT" = yes ]; then
    message "Building for 32-bit!"
-   C_COMPILER="${MINGW32_BASE}-gcc -msse"
-   CXX_COMPILER="${MINGW32_BASE}-g++ -msse"
+   C_COMPILER="${MINGW32_BASE}-gcc"
+   CXX_COMPILER="${MINGW32_BASE}-g++"
    WINDRES=${MINGW32_BASE}-windres
    do_build "RetroArch-w32" "RetroArch-win32-libs.zip" "x86"
 fi

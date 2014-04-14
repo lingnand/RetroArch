@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -51,7 +51,14 @@ void (*audio_convert_s16_to_float_arm)(float *out,
       const int16_t *in, size_t samples, float gain);
 void (*audio_convert_float_to_s16_arm)(int16_t *out,
       const float *in, size_t samples);
+#elif defined(_MIPS_ARCH_ALLEGREX)
+#define audio_convert_s16_to_float audio_convert_s16_to_float_ALLEGREX
+#define audio_convert_float_to_s16 audio_convert_float_to_s16_ALLEGREX
 
+void audio_convert_s16_to_float_ALLEGREX(float *out,
+      const int16_t *in, size_t samples, float gain);
+void audio_convert_float_to_s16_ALLEGREX(int16_t *out,
+      const float *in, size_t samples);
 #else
 #define audio_convert_s16_to_float audio_convert_s16_to_float_C
 #define audio_convert_float_to_s16 audio_convert_float_to_s16_C
@@ -63,11 +70,6 @@ void audio_convert_float_to_s16_C(int16_t *out,
       const float *in, size_t samples);
 
 void audio_convert_init_simd(void);
-
-#ifdef HAVE_RSOUND
-bool rarch_rsound_start(const char *ip);
-void rarch_rsound_stop(void);
-#endif
 
 #endif
 

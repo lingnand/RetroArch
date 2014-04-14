@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -15,6 +15,7 @@
 
 #include "getopt_rarch.h"
 #include "strl.h"
+#include "strcasestr.h"
 #include "posix_string.h"
 
 #ifndef HAVE_GETOPT_LONG
@@ -23,6 +24,7 @@
 #include "../boolean.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <ctype.h>
 #ifdef _MSC_VER
 #include "../msvc/msvc_compat.h"
 #endif
@@ -43,7 +45,8 @@ static bool is_long_option(const char *str)
 
 static int find_short_index(char * const *argv)
 {
-   for (int index = 0; argv[index]; index++)
+   int index;
+   for (index = 0; argv[index]; index++)
    {
       if (is_short_option(argv[index]))
          return index;
@@ -54,7 +57,8 @@ static int find_short_index(char * const *argv)
 
 static int find_long_index(char * const *argv)
 {
-   for (int index = 0; argv[index]; index++)
+   int index;
+   for (index = 0; argv[index]; index++)
    {
       if (is_long_option(argv[index]))
          return index;
@@ -109,8 +113,9 @@ static int parse_short(const char *optstring, char * const *argv)
 
 static int parse_long(const struct option *longopts, char * const *argv)
 {
+   size_t indice;
    const struct option *opt = NULL;
-   for (size_t indice = 0; longopts[indice].name; indice++)
+   for (indice = 0; longopts[indice].name; indice++)
    {
       if (strcmp(longopts[indice].name, &argv[0][2]) == 0)
       {
@@ -197,6 +202,39 @@ int getopt_long(int argc, char *argv[],
       return '?';
 }
 
+#endif
+
+#ifndef HAVE_STRCASESTR
+// Pretty much strncasecmp.
+static int casencmp(const char *a, const char *b, size_t n)
+{
+   size_t i;
+   for (i = 0; i < n; i++)
+   {
+      int a_lower = tolower(a[i]);
+      int b_lower = tolower(b[i]);
+      if (a_lower != b_lower)
+         return a_lower - b_lower;
+   }
+
+   return 0;
+}
+
+char *strcasestr_rarch__(const char *haystack, const char *needle)
+{
+   size_t i;
+   size_t hay_len = strlen(haystack);
+   size_t needle_len = strlen(needle);
+   if (needle_len > hay_len)
+      return NULL;
+
+   size_t search_off = hay_len - needle_len;
+   for (i = 0; i <= search_off; i++)
+      if (!casencmp(haystack + i, needle, needle_len))
+         return (char*)haystack + i;
+
+   return NULL;
+}
 #endif
 
 #ifndef HAVE_STRL

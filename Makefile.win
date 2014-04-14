@@ -1,6 +1,8 @@
 TARGET = retroarch.exe
 JTARGET = tools/retroarch-joyconfig.exe
 
+OBJDIR := obj-w32
+
 OBJ = frontend/frontend.o \
 		frontend/frontend_context.o \
 		retroarch.o \
@@ -12,20 +14,24 @@ OBJ = frontend/frontend.o \
 		hash.o \
 		dynamic.o \
 		dynamic_dummy.o \
-		message.o \
+		message_queue.o \
 		rewind.o \
 		movie.o \
 		gfx/gfx_common.o \
 		input/input_common.o \
+		input/keyboard_line.o \
+		input/autoconf/builtin_win.o \
 		core_options.o \
 		patch.o \
 		compat/compat.o \
 		screenshot.o \
 		cheats.o \
+		frontend/info/core_info.o \
 		audio/utils.o \
 		input/overlay.o \
 		fifo_buffer.o \
 		media/rarch.o \
+		gfx/context/win32_common.o \
 		gfx/scaler/scaler.o \
 		gfx/scaler/pixconv.o \
 		gfx/scaler/scaler_int.o \
@@ -34,7 +40,7 @@ OBJ = frontend/frontend.o \
 		gfx/shader_parse.o \
 		gfx/fonts/fonts.o \
 		gfx/fonts/bitmapfont.o \
-		gfx/image.o \
+		gfx/image/image.o \
 		audio/resampler.o \
 		audio/sinc.o \
 		performance.o
@@ -44,16 +50,26 @@ JOBJ := conf/config_file.o \
 	compat/compat.o \
 	file_path.o \
 	tools/input_common_joyconfig.o \
-	input/dinput.o
+	input/dinput.o \
+	input/winxinput_joypad.o
 
-CC = gcc
-CXX = g++
-WINDRES = windres
+HEADERS = $(wildcard */*/*.h) $(wildcard */*.h) $(wildcard *.h)
+
+ifneq ($(HOST_PREFIX),)
+   CC = $(HOST_PREFIX)gcc
+   CXX = $(HOST_PREFIX)g++
+   WINDRES = $(HOST_PREFIX)windres
+else
+   CC = gcc
+   CXX = g++
+   WINDRES = windres
+endif
 
 HAVE_DINPUT = 1
 HAVE_XAUDIO = 1
 HAVE_DSOUND = 1
 HAVE_OPENGL = 1
+HAVE_FBO = 1
 HAVE_DYLIB = 1
 HAVE_D3D9 = 1
 HAVE_NETPLAY = 1
@@ -62,6 +78,8 @@ HAVE_THREADS = 1
 HAVE_RGUI = 1
 DYNAMIC = 1
 
+HAVE_WINXINPUT = 1
+
 ifeq ($(SLIM),)
    HAVE_SDL = 1
    HAVE_SDL_IMAGE = 1
@@ -69,7 +87,6 @@ ifeq ($(SLIM),)
    HAVE_FREETYPE = 1
    HAVE_ZLIB = 1
    HAVE_RSOUND = 1
-   HAVE_FBO = 1
    HAVE_CG = 1
    HAVE_PYTHON = 1
    HAVE_FFMPEG = 1
@@ -78,7 +95,7 @@ endif
 libretro ?= -lretro
 
 LIBS = -lm
-DEFINES = -I. -DHAVE_SCREENSHOTS -DHAVE_BSV_MOVIE
+DEFINES = -I. -DHAVE_SCREENSHOTS -DHAVE_BSV_MOVIE -DHAVE_BUILTIN_AUTOCONFIG -DRARCH_INTERNAL
 LDFLAGS = -L. -static-libgcc
 
 ifeq ($(TDM_GCC),)
@@ -96,8 +113,8 @@ endif
 JLIBS =
 
 ifeq ($(HAVE_RGUI), 1)
-   DEFINES += -DHAVE_RGUI
-   OBJ += frontend/menu/menu_common.o frontend/menu/rgui.o frontend/menu/history.o
+   DEFINES += -DHAVE_RGUI -DHAVE_MENU
+   OBJ += frontend/menu/menu_input_line_cb.o frontend/menu/menu_common.o frontend/menu/menu_settings.o frontend/menu/menu_navigation.o frontend/menu/file_list.o frontend/menu/disp/rgui.o frontend/menu/history.o
 endif
 
 ifeq ($(HAVE_SDL), 1)
@@ -109,12 +126,12 @@ ifeq ($(HAVE_SDL), 1)
 endif
 
 ifeq ($(HAVE_THREADS), 1)
-   OBJ += autosave.o thread.o gfx/thread_wrapper.o
+   OBJ += autosave.o thread.o gfx/video_thread_wrapper.o audio/thread_wrapper.o
    DEFINES += -DHAVE_THREADS
 endif
 
 ifeq ($(HAVE_OPENGL), 1)
-   OBJ += gfx/gl.o gfx/math/matrix.o gfx/fonts/gl_font.o gfx/fonts/gl_raster_font.o gfx/gfx_context.o gfx/context/wgl_ctx.o gfx/shader_glsl.o 
+   OBJ += gfx/gl.o gfx/math/matrix.o gfx/fonts/gl_font.o gfx/fonts/gl_raster_font.o gfx/gfx_context.o gfx/context/wgl_ctx.o gfx/shader_glsl.o gfx/glsym/rglgen.o gfx/glsym/glsym_gl.o
    DEFINES += -DHAVE_OPENGL -DHAVE_OVERLAY -DHAVE_GLSL -DHAVE_GL_SYNC
    LIBS += -lopengl32 -lgdi32 -lcomdlg32
 endif
@@ -133,7 +150,7 @@ else
 endif
 
 ifeq ($(HAVE_D3D9), 1)
-   OBJ += gfx/d3d9/d3d9.o gfx/d3d9/render_chain.o
+   OBJ += gfx/d3d9/d3d.o gfx/d3d9/render_chain.o gfx/fonts/d3d_font.o gfx/fonts/d3d_w32_font.o gfx/context/d3d_ctx.o
    DEFINES += -DHAVE_WIN32_D3D9
    LIBS += -ld3d9 -lcg -lcgD3D9 -ld3dx9 -ldxguid
 endif
@@ -212,6 +229,11 @@ ifeq ($(HAVE_PYTHON), 1)
    OBJ += gfx/py_state/py_state.o
 endif
 
+ifeq ($(HAVE_WINXINPUT), 1)
+   DEFINES += -DHAVE_WINXINPUT
+   OBJ += input/winxinput_joypad.o
+endif
+
 ifeq ($(HAVE_DINPUT), 1)
    LIBS += -ldinput8 -ldxguid -lole32
    DEFINES += -DHAVE_DINPUT
@@ -237,84 +259,94 @@ else
    LDCXXFLAGS += -s
 endif
 
+ifeq ($(GL_DEBUG), 1)
+   CFLAGS += -DGL_DEBUG
+   CXXFLAGS += -DGL_DEBUG
+endif
+
 CFLAGS += -Wall -Wno-unused-result -Wno-unused-variable -I.
 CXXFLAGS += -Wall -Wno-unused-result -Wno-unused-variable -I. -std=c++0x -D__STDC_CONSTANT_MACROS
 ifeq ($(CXX_BUILD), 1)
    CFLAGS += -std=c++0x -xc++ -D__STDC_CONSTANT_MACROS
 else
-   CFLAGS += -std=gnu99
+   ifneq ($(GNU90_BUILD), 1)
+      CFLAGS += -std=gnu99
+   endif
 endif
+
+GIT_VERSION := $(shell git rev-parse --short HEAD 2>/dev/null)
+ifneq ($(GIT_VERSION),)
+   DEFINES += -DHAVE_GIT_VERSION -DGIT_VERSION=\"$(GIT_VERSION)\"
+   OBJ += git_version.o
+endif
+
+RARCH_OBJ := $(addprefix $(OBJDIR)/,$(OBJ))
+RARCH_JOBJ := $(addprefix $(OBJDIR)/,$(JOBJ))
 
 all: $(TARGET) $(JTARGET)
 
-$(TARGET): $(OBJ)
+-include $(RARCH_OBJ:.o=.d) $(RARCH_JOBJ:.o=.d)
+
+$(TARGET): $(RARCH_OBJ)
 	@$(if $(Q), $(shell echo echo LD $@),)
-	$(Q)$(CXX) -o $@ $(OBJ) $(LIBS) $(LDFLAGS) $(LDCXXFLAGS)
+	$(Q)$(CXX) -o $@ $(RARCH_OBJ) $(LIBS) $(LDFLAGS) $(LDCXXFLAGS)
 
-%.o: %.c
+$(OBJDIR)/%.o: %.c
+	@mkdir -p $(dir $@)
 	@$(if $(Q), $(shell echo echo CC $<),)
-	$(Q)$(CC) $(CFLAGS) $(DEFINES) -c -o $@ $<
+	$(Q)$(CC) $(CFLAGS) $(DEFINES) -MMD -c -o $@ $<
 
-tools/input_common_joyconfig.o: input/input_common.c
+.FORCE:
+
+$(OBJDIR)/git_version.o: git_version.c .FORCE
+	@mkdir -p $(dir $@)
 	@$(if $(Q), $(shell echo echo CC $<),)
-	$(Q)$(CC) $(CFLAGS) $(DEFINES) -DIS_JOYCONFIG -c -o $@ $<
+	$(Q)$(CC) $(CFLAGS) $(DEFINES) -MMD -c -o $@ $<
 
-%.o: %.cpp
+$(OBJDIR)/tools/input_common_joyconfig.o: input/input_common.c
+	@mkdir -p $(dir $@)
+	@$(if $(Q), $(shell echo echo CC $<),)
+	$(Q)$(CC) $(CFLAGS) $(DEFINES) -DIS_JOYCONFIG -MMD -c -o $@ $<
+
+$(OBJDIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
 	@$(if $(Q), $(shell echo echo CXX $<),)
-	$(Q)$(CXX) $(CXXFLAGS) $(DEFINES) -c -o $@ $<
+	$(Q)$(CXX) $(CXXFLAGS) $(DEFINES) -MMD -c -o $@ $<
 
-%.o: %.rc
+$(OBJDIR)/%.o: %.rc $(HEADERS)
+	@mkdir -p $(dir $@)
 	@$(if $(Q), $(shell echo echo WINDRES $<),)
 	$(Q)$(WINDRES) -o $@ $<
 
-$(JTARGET): $(JOBJ)
+$(JTARGET): $(RARCH_JOBJ)
 	@$(if $(Q), $(shell echo echo LD $@),)
 ifeq ($(CXX_BUILD), 1)
-	$(Q)$(CXX) -o $@ $(JOBJ) -ldxguid -ldinput8 -lole32 $(LDFLAGS) $(JLIBS)
+	$(Q)$(CXX) -o $@ $(RARCH_JOBJ) -ldxguid -ldinput8 -lole32 $(LDFLAGS) $(JLIBS)
 else
-	$(Q)$(CC) -o $@ $(JOBJ) -ldxguid -ldinput8 -lole32 $(LDFLAGS) $(JLIBS)
+	$(Q)$(CC) -o $@ $(RARCH_JOBJ) -ldxguid -ldinput8 -lole32 $(LDFLAGS) $(JLIBS)
 endif
 
 clean:
-	rm -f *.o
-	rm -f deps/miniz/*.o
-	rm -f frontend/*.o
-	rm -f frontend/menu/*.o
-	rm -f audio/*.o
-	rm -f audio/xaudio-c/*.o
-	rm -f compat/*.o
-	rm -f compat/rxml/*.o
-	rm -f conf/*.o
-	rm -f gfx/scaler/*.o
-	rm -f gfx/*.o
-	rm -f gfx/d3d9/*.o
-	rm -f gfx/context/*.o
-	rm -f gfx/math/*.o
-	rm -f gfx/fonts/*.o
-	rm -f gfx/py_state/*.o
-	rm -f gfx/rpng/*.o
-	rm -f record/*.o
-	rm -f input/*.o
+	rm -rf $(OBJDIR)
 	rm -f $(TARGET)
-	rm -f retroarch-joyconfig.exe
-	rm -f tools/*.o
+	rm -f tools/retroarch-joyconfig.exe
 
 dist_x86: all
-	zip -r retroarch-win32-0.9.9.zip $(TARGET) $(JTARGET) retroarch.cfg
+	zip -r retroarch-win32-1.0.zip $(TARGET) $(JTARGET) retroarch.cfg
 
 dist_x86_64: all
-	zip -r retroarch-win64-0.9.9.zip $(TARGET) $(JTARGET) retroarch.cfg
+	zip -r retroarch-win64-1.0.zip $(TARGET) $(JTARGET) retroarch.cfg
 
 libs_x86:
-	wget https://github.com/downloads/Themaister/RetroArch/RetroArch-win32-libs.zip --no-check-certificate
+	wget http://themaister.net/retroarch-dl/RetroArch-win32-libs.zip
 	unzip RetroArch-win32-libs.zip
-	wget https://github.com/downloads/Themaister/RetroArch/RetroArch-win32-headers.zip --no-check-certificate
+	wget http://themaister.net/retroarch-dl/RetroArch-win32-headers.zip
 	unzip RetroArch-win32-headers.zip
 
 libs_x86_64:
-	wget https://github.com/downloads/Themaister/RetroArch/RetroArch-win64-libs.zip --no-check-certificate
+	wget http://themaister.net/retroarch-dl/RetroArch-win64-libs.zip
 	unzip RetroArch-win64-libs.zip
-	wget https://github.com/downloads/Themaister/RetroArch/RetroArch-win64-headers.zip --no-check-certificate
+	wget http://themaister.net/retroarch-dl/RetroArch-win64-headers.zip
 	unzip RetroArch-win64-headers.zip
 
 .PHONY: all install uninstall clean dist_x86 dist_x86_64 libs_x86 libs_x86_64

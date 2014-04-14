@@ -32,11 +32,11 @@
 								<option id="com.qnx.qcc.option.compiler.defines.1775248205" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE=2"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
+									<listOptionValue builtIn="false" value="HAVE_MENU"/>
 									<listOptionValue builtIn="false" value="HAVE_NEON"/>
+									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="RARCH_MOBILE"/>
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
-									<listOptionValue builtIn="false" value="HAVE_RARCH_MAIN_IMPLEMENTATION"/>
-									<listOptionValue builtIn="false" value="HAVE_VID_CONTEXT"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
@@ -154,11 +154,10 @@
 								<option id="com.qnx.qcc.option.compiler.defines.426935293" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE=2"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
+									<listOptionValue builtIn="false" value="HAVE_MENU"/>
 									<listOptionValue builtIn="false" value="HAVE_NEON"/>
 									<listOptionValue builtIn="false" value="RARCH_MOBILE"/>
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
-									<listOptionValue builtIn="false" value="HAVE_RARCH_MAIN_IMPLEMENTATION"/>
-									<listOptionValue builtIn="false" value="HAVE_VID_CONTEXT"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
@@ -168,7 +167,7 @@
 									<listOptionValue builtIn="false" value="HAVE_OPENGLES"/>
 									<listOptionValue builtIn="false" value="HAVE_OPENGLES2"/>
 									<listOptionValue builtIn="false" value="HAVE_NULLINPUT"/>
-									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
+									<listOptionValue builtIn="false" value="HAVE_AL"/>
 									<listOptionValue builtIn="false" value="HAVE_THREADS"/>
 									<listOptionValue builtIn="false" value="WANT_MINIZ"/>
 									<listOptionValue builtIn="false" value="HAVE_OVERLAY"/>
@@ -271,11 +270,10 @@
 								<option id="com.qnx.qcc.option.compiler.defines.213513124" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE=2"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
+									<listOptionValue builtIn="false" value="HAVE_MENU"/>
 									<listOptionValue builtIn="false" value="HAVE_NEON"/>
 									<listOptionValue builtIn="false" value="RARCH_MOBILE"/>
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
-									<listOptionValue builtIn="false" value="HAVE_RARCH_MAIN_IMPLEMENTATION"/>
-									<listOptionValue builtIn="false" value="HAVE_VID_CONTEXT"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
@@ -389,11 +387,10 @@
 								<option id="com.qnx.qcc.option.compiler.defines.1725725626" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE=2"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
+									<listOptionValue builtIn="false" value="HAVE_MENU"/>
 									<listOptionValue builtIn="false" value="HAVE_NEON"/>
 									<listOptionValue builtIn="false" value="RARCH_MOBILE"/>
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
-									<listOptionValue builtIn="false" value="HAVE_RARCH_MAIN_IMPLEMENTATION"/>
-									<listOptionValue builtIn="false" value="HAVE_VID_CONTEXT"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>

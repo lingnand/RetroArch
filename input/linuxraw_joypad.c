@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -84,14 +84,14 @@ static bool linuxraw_joypad_init_pad(const char *path, struct linuxraw_joypad *p
       {
          RARCH_LOG("[Joypad]: Found pad: %s on %s.\n", pad->ident, path);
 
+#ifndef IS_JOYCONFIG
          if (g_hotplug)
          {
             char msg[512];
             snprintf(msg, sizeof(msg), "Joypad #%u (%s) connected.", (unsigned)(pad - g_pads), pad->ident);
-#ifndef IS_JOYCONFIG
             msg_queue_push(g_extern.msg_queue, msg, 0, 60);
-#endif
          }
+#endif
       }
 
       else
@@ -112,17 +112,17 @@ static bool linuxraw_joypad_init_pad(const char *path, struct linuxraw_joypad *p
 
 static void handle_plugged_pad(void)
 {
+   int i, rc;
    size_t event_size = sizeof(struct inotify_event) + NAME_MAX + 1;
    uint8_t *event_buf = (uint8_t*)calloc(1, event_size);
    if (!event_buf)
       return;
 
-   int rc;
    while ((rc = read(g_notify, event_buf, event_size)) >= 0)
    {
       struct inotify_event *event = NULL;
       // Can read multiple events in one read() call.
-      for (int i = 0; i < rc; i += event->len + sizeof(struct inotify_event))
+      for (i = 0; i < rc; i += event->len + sizeof(struct inotify_event))
       {
          event = (struct inotify_event*)&event_buf[i];
 
@@ -137,14 +137,14 @@ static void handle_plugged_pad(void)
          {
             if (g_pads[index].fd >= 0)
             {
+#ifndef IS_JOYCONFIG
                if (g_hotplug)
                {
                   char msg[512];
                   snprintf(msg, sizeof(msg), "Joypad #%u (%s) disconnected.", index, g_pads[index].ident);
-#ifndef IS_JOYCONFIG
                   msg_queue_push(g_extern.msg_queue, msg, 0, 60);
-#endif
                }
+#endif
 
                RARCH_LOG("[Joypad]: Joypad %s disconnected.\n", g_pads[index].ident);
                close(g_pads[index].fd);
@@ -174,7 +174,7 @@ static void handle_plugged_pad(void)
 
 static void linuxraw_joypad_poll(void)
 {
-   int ret;
+   int i, ret;
    struct epoll_event events[MAX_PLAYERS + 1];
 
 retry:
@@ -182,7 +182,7 @@ retry:
    if (ret < 0 && errno == EINTR)
       goto retry;
 
-   for (int i = 0; i < ret; i++)
+   for (i = 0; i < ret; i++)
    {
       if (events[i].data.ptr)
          poll_pad((struct linuxraw_joypad*)events[i].data.ptr);
@@ -199,11 +199,12 @@ static void linuxraw_joypad_setup_notify(void)
 
 static bool linuxraw_joypad_init(void)
 {
+   unsigned i;
    g_epoll = epoll_create(MAX_PLAYERS + 1);
    if (g_epoll < 0)
       return false;
 
-   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+   for (i = 0; i < MAX_PLAYERS; i++)
    {
       struct linuxraw_joypad *pad = &g_pads[i];
       pad->fd = -1;
@@ -239,14 +240,15 @@ static bool linuxraw_joypad_init(void)
 
 static void linuxraw_joypad_destroy(void)
 {
-   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+   unsigned i;
+   for (i = 0; i < MAX_PLAYERS; i++)
    {
       if (g_pads[i].fd >= 0)
          close(g_pads[i].fd);
    }
 
    memset(g_pads, 0, sizeof(g_pads));
-   for (unsigned i = 0; i < MAX_PLAYERS; i++)
+   for (i = 0; i < MAX_PLAYERS; i++)
       g_pads[i].fd = -1;
 
    if (g_notify >= 0)
@@ -312,6 +314,7 @@ const rarch_joypad_driver_t linuxraw_joypad = {
    linuxraw_joypad_button,
    linuxraw_joypad_axis,
    linuxraw_joypad_poll,
+   NULL,
    linuxraw_joypad_name,
    "linuxraw",
 };

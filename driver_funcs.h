@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -17,6 +17,12 @@
 // Convenience macros.
 #ifndef _RARCH_DRIVER_FUNCS_H
 #define _RARCH_DRIVER_FUNCS_H
+
+#define camera_init_func(device, caps, width, height) driver.camera->init(device, caps, width, height)
+
+#define location_init_func() driver.location->init()
+
+#define osk_init_func(unknown) driver.osk->init(unknown)
 
 #define audio_init_func(device, rate, latency)  driver.audio->init(device, rate, latency)
 #define audio_write_func(buf, size)             driver.audio->write(driver.audio_data, buf, size)
@@ -50,18 +56,18 @@
 
 static inline bool input_key_pressed_func(int key)
 {
-   if (driver.block_hotkey)
-      return false;
+   bool ret = false;
 
-   bool ret = driver.input->key_pressed(driver.input_data, key);
+   if (!driver.block_hotkey)
+      ret = ret || driver.input->key_pressed(driver.input_data, key);
 
 #ifdef HAVE_OVERLAY
-   ret |= driver.overlay_state & (UINT64_C(1) << key);
+   ret = ret || (driver.overlay_state.buttons & (1ULL << key));
 #endif
 
 #ifdef HAVE_COMMAND
-   if (!ret && driver.command)
-      ret = rarch_cmd_get(driver.command, key);
+   if (driver.command)
+      ret = ret || rarch_cmd_get(driver.command, key);
 #endif
 
    return ret;

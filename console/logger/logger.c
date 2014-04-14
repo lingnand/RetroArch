@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -14,7 +14,7 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef __CELLOS_LV2__
+#if defined(__CELLOS_LV2__)
 #include "../../ps3/sdk_defines.h"
 #ifndef __PSL1GHT__
 #include <netex/net.h>
@@ -25,9 +25,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#endif
-
-#ifdef GEKKO
+#elif defined(GEKKO)
 #include <network.h>
 #endif
 
@@ -149,8 +147,13 @@ void logger_send(const char *__format,...)
    va_list args;
 
    va_start(args,__format);
-   vsnprintf(sendbuf,4000,__format, args);
+   logger_send_v(__format, args);
    va_end(args);
+}
+
+void logger_send_v(const char *__format, va_list args)
+{
+   vsnprintf(sendbuf,4000,__format, args);
 
    int len=strlen(sendbuf);
    sendto(sock,sendbuf,len,MSG_DONTWAIT,(struct sockaddr*)&target,sizeof(target));

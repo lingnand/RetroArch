@@ -1,6 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -56,11 +56,22 @@ static inline int pthread_mutex_unlock(pthread_mutex_t *mutex)
    return LWP_MutexUnlock(*mutex);
 }
 
+static inline void pthread_exit(void *retval)
+{
+   /* FIXME: No LWP equivalent for this? */
+   (void)retval;
+}
+
+static inline int pthread_detach(pthread_t thread)
+{
+   /* FIXME: pthread_detach equivalent missing? */
+   (void)thread;
+   return 0;
+}
+
 static inline int pthread_join(pthread_t thread, void **retval)
 {
-   // FIXME: Shouldn't the second arg to LWP_JoinThread take retval?
-   (void)retval;
-   return LWP_JoinThread(thread, NULL);
+   return LWP_JoinThread(thread, retval);
 }
 
 static inline int pthread_mutex_trylock(pthread_mutex_t *mutex)
@@ -75,7 +86,7 @@ static inline int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex
 
 static inline int pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex, const struct timespec *abstime)
 {
-   return LWP_CondWait(*cond, *mutex);
+   return LWP_CondTimedWait(*cond, *mutex, abstime);
 }
 
 static inline int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
@@ -86,6 +97,11 @@ static inline int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr
 static inline int pthread_cond_signal(pthread_cond_t *cond)
 {
    return LWP_CondSignal(*cond);
+}
+
+static inline int pthread_cond_broadcast(pthread_cond_t *cond)
+{
+   return LWP_CondBroadcast(*cond);
 }
 
 static inline int pthread_cond_destroy(pthread_cond_t *cond)

@@ -1,6 +1,7 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2013 - Daniel De Matteis
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
+ *  Copyright (C) 2013-2014 - Steven Crowe
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -26,10 +27,24 @@ enum {
    ICADE_PROFILE_IPEGA_PG9017,
    ICADE_PROFILE_IPEGA_PG9017_MODE2,
    ICADE_PROFILE_GAMESTOP_WIRELESS,
+   ICADE_PROFILE_G910,
+   ICADE_PROFILE_MOGA_HERO_POWER,
 } icade_profile_enums;
 
 enum {
    AKEYCODE_META_FUNCTION_ON = 8,
+   AKEYCODE_NUMPAD_LCK_0    = 96,
+   AKEYCODE_NUMPAD_LCK_1    = 97,
+   AKEYCODE_NUMPAD_LCK_2    = 98,
+   AKEYCODE_NUMPAD_LCK_3    = 99,
+   AKEYCODE_NUMPAD_LCK_4    = 100,
+   AKEYCODE_NUMPAD_LCK_5    = 101,
+   AKEYCODE_NUMPAD_LCK_6    = 102,
+   AKEYCODE_NUMPAD_LCK_7    = 103,
+   AKEYCODE_NUMPAD_LCK_8    = 104,
+   AKEYCODE_NUMPAD_LCK_9    = 105,
+   AKEYCODE_OTHR_108        = 108,
+   AKEYCODE_NUMPAD_SUB      = 109,
    AKEYCODE_ESCAPE          = 111,
    AKEYCODE_FORWARD_DEL     = 112,
    AKEYCODE_CTRL_LEFT       = 113,

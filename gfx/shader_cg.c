@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -26,7 +26,7 @@
 #include <string.h>
 #include "../compat/strl.h"
 #include "../conf/config_file.h"
-#include "image.h"
+#include "image/image.h"
 #include "../dynamic.h"
 #include "../compat/posix_string.h"
 #include "../file.h"
@@ -37,27 +37,33 @@
 
 // Used when we call deactivate() since just unbinding the program didn't seem to work... :(
 static const char *stock_cg_program =
+      "struct input"
+      "{"
+      "  float2 tex_coord;"
+      "  float4 color;"
+      "  float4 vertex_coord;"
+      "  uniform float4x4 mvp_matrix;"
+      "  uniform sampler2D texture;"
+      "};"
+      "struct vertex_data"
+      "{"
+      "  float2 tex;"
+      "  float4 color;"
+      "};"
       "void main_vertex"
       "("
-      "	float4 position : POSITION,"
-      "	float2 texCoord : TEXCOORD0,"
-      "  float4 color : COLOR,"
-      ""
-      "  uniform float4x4 modelViewProj,"
-      ""
       "	out float4 oPosition : POSITION,"
-      "	out float2 otexCoord : TEXCOORD0,"
-      "  out float4 oColor : COLOR"
+      "  input IN,"
+      "  out vertex_data vert"
       ")"
       "{"
-      "	oPosition = mul(modelViewProj, position);"
-      "	otexCoord = texCoord;"
-      "  oColor = color;"
+      "	oPosition = mul(IN.mvp_matrix, IN.vertex_coord);"
+      "  vert = vertex_data(IN.tex_coord, IN.color);"
       "}"
       ""
-      "float4 main_fragment(in float4 color : COLOR, float2 tex : TEXCOORD0, uniform sampler2D s0 : TEXUNIT0) : COLOR"
+      "float4 main_fragment(input IN, vertex_data vert, uniform sampler2D s0 : TEXUNIT0) : COLOR"
       "{"
-      "   return color * tex2D(s0, tex);"
+      "  return vert.color * tex2D(s0, vert.tex);"
       "}";
 
 #ifdef RARCH_CG_DEBUG
@@ -96,9 +102,9 @@ struct cg_fbo_params
    CGparameter coord;
 };
 
-#define MAX_TEXTURES 8
+#define MAX_LUT_TEXTURES 8
 #define MAX_VARIABLES 64
-#define PREV_TEXTURES (TEXTURES - 1)
+#define PREV_TEXTURES (MAX_TEXTURES - 1)
 
 struct cg_program
 {
@@ -136,20 +142,22 @@ static unsigned active_index;
 static struct gfx_shader *cg_shader;
 
 static state_tracker_t *state_tracker;
-static GLuint lut_textures[MAX_TEXTURES];
+static GLuint lut_textures[MAX_LUT_TEXTURES];
 
 static CGparameter cg_attribs[PREV_TEXTURES + 1 + 4 + GFX_MAX_SHADERS];
 static unsigned cg_attrib_index;
 
 static void gl_cg_reset_attrib(void)
 {
-   for (unsigned i = 0; i < cg_attrib_index; i++)
+   unsigned i;
+   for (i = 0; i < cg_attrib_index; i++)
       cgGLDisableClientState(cg_attribs[i]);
    cg_attrib_index = 0;
 }
 
-static bool gl_cg_set_mvp(const math_matrix *mat)
+static bool gl_cg_set_mvp(void *data, const math_matrix *mat)
 {
+   (void)data;
    if (cg_active && prg[active_index].mvp)
    {
       cgGLSetMatrixParameterfc(prg[active_index].mvp, mat->data);
@@ -186,7 +194,7 @@ static bool gl_cg_set_coords(const struct gl_coords *coords)
 #define set_param_1f(param, x) \
    if (param) cgGLSetParameter1f(param, x)
 
-static void gl_cg_set_params(unsigned width, unsigned height, 
+static void gl_cg_set_params(void *data, unsigned width, unsigned height, 
       unsigned tex_width, unsigned tex_height,
       unsigned out_width, unsigned out_height,
       unsigned frame_count,
@@ -195,6 +203,8 @@ static void gl_cg_set_params(unsigned width, unsigned height,
       const struct gl_tex_info *fbo_info,
       unsigned fbo_info_cnt)
 {
+   (void)data;
+   unsigned i;
    if (!cg_active || (active_index == 0) || (active_index == GL_SHADER_STOCK_BLEND))
       return;
 
@@ -239,7 +249,7 @@ static void gl_cg_set_params(unsigned width, unsigned height,
    }
 
    // Set prev textures.
-   for (unsigned i = 0; i < PREV_TEXTURES; i++)
+   for (i = 0; i < PREV_TEXTURES; i++)
    {
       param = prg[active_index].prev[i].tex;
       if (param)
@@ -262,7 +272,7 @@ static void gl_cg_set_params(unsigned width, unsigned height,
    }
 
    // Set lookup textures.
-   for (unsigned i = 0; i < cg_shader->luts; i++)
+   for (i = 0; i < cg_shader->luts; i++)
    {
       CGparameter fparam = cgGetNamedParameter(prg[active_index].fprg, cg_shader->lut[i].id);
       if (fparam)
@@ -282,7 +292,7 @@ static void gl_cg_set_params(unsigned width, unsigned height,
    // Set FBO textures.
    if (active_index > 2)
    {
-      for (unsigned i = 0; i < fbo_info_cnt; i++)
+      for (i = 0; i < fbo_info_cnt; i++)
       {
          if (prg[active_index].fbo[i].tex)
          {
@@ -315,7 +325,7 @@ static void gl_cg_set_params(unsigned width, unsigned height,
       if (active_index == 1)
          cnt = state_get_uniform(state_tracker, info, MAX_VARIABLES, frame_count);
 
-      for (unsigned i = 0; i < cnt; i++)
+      for (i = 0; i < cnt; i++)
       {
          CGparameter param_v = cgGetNamedParameter(prg[active_index].vprg, info[i].id);
          CGparameter param_f = cgGetNamedParameter(prg[active_index].fprg, info[i].id);
@@ -327,12 +337,13 @@ static void gl_cg_set_params(unsigned width, unsigned height,
 
 static void gl_cg_deinit_progs(void)
 {
+   unsigned i;
    RARCH_LOG("CG: Destroying programs.\n");
    cgGLUnbindProgram(cgFProf);
    cgGLUnbindProgram(cgVProf);
 
    // Programs may alias [0].
-   for (unsigned i = 1; i < GFX_MAX_SHADERS; i++)
+   for (i = 1; i < GFX_MAX_SHADERS; i++)
    {
       if (prg[i].fprg && prg[i].fprg != prg[0].fprg)
          cgDestroyProgram(prg[i].fprg);
@@ -391,8 +402,6 @@ static void gl_cg_deinit(void)
    gl_cg_deinit_state();
    gl_cg_deinit_context_state();
 }
-
-static bool gl_cg_init(const char *path);
 
 #define SET_LISTING(type) \
 { \
@@ -487,18 +496,12 @@ static bool load_plain(const char *path)
 
 #define print_buf(buf, ...) snprintf(buf, sizeof(buf), __VA_ARGS__)
 
-#ifdef HAVE_OPENGLES2
-#define BORDER_FUNC GL_CLAMP_TO_EDGE
-#else
-#define BORDER_FUNC GL_CLAMP_TO_BORDER
-#endif
-
-static void load_texture_data(GLuint obj, const struct texture_image *img, bool smooth)
+static void load_texture_data(GLuint obj, const struct texture_image *img, bool smooth, GLenum wrap)
 {
    glBindTexture(GL_TEXTURE_2D, obj);
 
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, BORDER_FUNC);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, BORDER_FUNC);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, smooth ? GL_LINEAR : GL_NEAREST);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, smooth ? GL_LINEAR : GL_NEAREST);
 
@@ -508,23 +511,22 @@ static void load_texture_data(GLuint obj, const struct texture_image *img, bool 
    glTexImage2D(GL_TEXTURE_2D,
          0, driver.gfx_use_rgba ? GL_RGBA : RARCH_GL_INTERNAL_FORMAT32, img->width, img->height,
          0, driver.gfx_use_rgba ? GL_RGBA : RARCH_GL_TEXTURE_TYPE32, RARCH_GL_FORMAT32, img->pixels);
-
-   free(img->pixels);
 }
 
 static bool load_textures(void)
 {
+   unsigned i;
    if (!cg_shader->luts)
       return true;
 
    glGenTextures(cg_shader->luts, lut_textures);
 
-   for (unsigned i = 0; i < cg_shader->luts; i++)
+   for (i = 0; i < cg_shader->luts; i++)
    {
       RARCH_LOG("Loading image from: \"%s\".\n",
             cg_shader->lut[i].path);
 
-      struct texture_image img;
+      struct texture_image img = {0};
       if (!texture_image_load(cg_shader->lut[i].path, &img))
       {
          RARCH_ERR("Failed to load picture ...\n");
@@ -532,7 +534,9 @@ static bool load_textures(void)
       }
 
       load_texture_data(lut_textures[i], &img,
-            cg_shader->lut[i].filter != RARCH_FILTER_NEAREST);
+            cg_shader->lut[i].filter != RARCH_FILTER_NEAREST,
+            gl_wrap_type_to_enum(cg_shader->lut[i].wrap));
+      texture_image_free(&img);
    }
 
    glBindTexture(GL_TEXTURE_2D, 0);
@@ -541,12 +545,13 @@ static bool load_textures(void)
 
 static bool load_imports(void)
 {
+   unsigned i;
    if (!cg_shader->variables)
       return true;
 
    struct state_tracker_info tracker_info = {0};
 
-   for (unsigned i = 0; i < cg_shader->variables; i++)
+   for (i = 0; i < cg_shader->variables; i++)
    {
       unsigned memtype;
       switch (cg_shader->variable[i].ram_type)
@@ -600,6 +605,7 @@ static bool load_shader(unsigned i)
 
 static bool load_preset(const char *path)
 {
+   unsigned i;
    if (!load_stock())
       return false;
 
@@ -631,7 +637,7 @@ static bool load_preset(const char *path)
       RARCH_WARN("Too many shaders ... Capping shader amount to %d.\n", GFX_MAX_SHADERS - 3);
       cg_shader->passes = GFX_MAX_SHADERS - 3;
    }
-   for (unsigned i = 0; i < cg_shader->passes; i++)
+   for (i = 0; i < cg_shader->passes; i++)
    {
       if (!load_shader(i))
       {
@@ -678,10 +684,46 @@ static void set_program_base_attrib(unsigned i)
       else if (strcmp(semantic, "TEXCOORD1") == 0)
          prg[i].lut_tex = param;
    }
+
+   if (!prg[i].tex)
+      prg[i].tex = cgGetNamedParameter(prg[i].vprg, "IN.tex_coord");
+   if (!prg[i].color)
+      prg[i].color = cgGetNamedParameter(prg[i].vprg, "IN.color");
+   if (!prg[i].vertex)
+      prg[i].vertex = cgGetNamedParameter(prg[i].vprg, "IN.vertex_coord");
+   if (!prg[i].lut_tex)
+      prg[i].lut_tex = cgGetNamedParameter(prg[i].vprg, "IN.lut_tex_coord");
+}
+
+static void set_pass_attrib(struct cg_program *prg, struct cg_fbo_params *fbo,
+      const char *attr)
+{
+   char attr_buf[64];
+
+   snprintf(attr_buf, sizeof(attr_buf), "%s.texture", attr);
+   if (!fbo->tex)
+      fbo->tex = cgGetNamedParameter(prg->fprg, attr_buf);
+
+   snprintf(attr_buf, sizeof(attr_buf), "%s.video_size", attr);
+   if (!fbo->vid_size_v)
+      fbo->vid_size_v = cgGetNamedParameter(prg->vprg, attr_buf);
+   if (!fbo->vid_size_f)
+      fbo->vid_size_f = cgGetNamedParameter(prg->fprg, attr_buf);
+
+   snprintf(attr_buf, sizeof(attr_buf), "%s.texture_size", attr);
+   if (!fbo->tex_size_v)
+      fbo->tex_size_v = cgGetNamedParameter(prg->vprg, attr_buf);
+   if (!fbo->tex_size_f)
+      fbo->tex_size_f = cgGetNamedParameter(prg->fprg, attr_buf);
+
+   snprintf(attr_buf, sizeof(attr_buf), "%s.tex_coord", attr);
+   if (!fbo->coord)
+      fbo->coord = cgGetNamedParameter(prg->vprg, attr_buf);
 }
 
 static void set_program_attributes(unsigned i)
 {
+   unsigned j;
    cgGLBindProgram(prg[i].fprg);
    cgGLBindProgram(prg[i].vprg);
 
@@ -697,7 +739,10 @@ static void set_program_attributes(unsigned i)
    prg[i].out_size_v = cgGetNamedParameter(prg[i].vprg, "IN.output_size");
    prg[i].frame_cnt_v = cgGetNamedParameter(prg[i].vprg, "IN.frame_count");
    prg[i].frame_dir_v = cgGetNamedParameter(prg[i].vprg, "IN.frame_direction");
+
    prg[i].mvp = cgGetNamedParameter(prg[i].vprg, "modelViewProj");
+   if (!prg[i].mvp)
+      prg[i].mvp = cgGetNamedParameter(prg[i].vprg, "IN.mvp_matrix");
 
    prg[i].orig.tex = cgGetNamedParameter(prg[i].fprg, "ORIG.texture");
    prg[i].orig.vid_size_v = cgGetNamedParameter(prg[i].vprg, "ORIG.video_size");
@@ -706,7 +751,14 @@ static void set_program_attributes(unsigned i)
    prg[i].orig.tex_size_f = cgGetNamedParameter(prg[i].fprg, "ORIG.texture_size");
    prg[i].orig.coord = cgGetNamedParameter(prg[i].vprg, "ORIG.tex_coord");
 
-   for (unsigned j = 0; j < PREV_TEXTURES; j++)
+   if (i > 1)
+   {
+      char pass_str[64];
+      snprintf(pass_str, sizeof(pass_str), "PASSPREV%u", i);
+      set_pass_attrib(&prg[i], &prg[i].orig, pass_str);
+   }
+
+   for (j = 0; j < PREV_TEXTURES; j++)
    {
       char attr_buf_tex[64];
       char attr_buf_vid_size[64];
@@ -738,28 +790,20 @@ static void set_program_attributes(unsigned i)
       prg[i].prev[j].coord = cgGetNamedParameter(prg[i].vprg, attr_buf_coord);
    }
 
-   for (unsigned j = 0; j < i - 1; j++)
+   for (j = 0; j < i - 1; j++)
    {
-      char attr_buf[64];
-
-      snprintf(attr_buf, sizeof(attr_buf), "PASS%u.texture", j + 1);
-      prg[i].fbo[j].tex = cgGetNamedParameter(prg[i].fprg, attr_buf);
-
-      snprintf(attr_buf, sizeof(attr_buf), "PASS%u.video_size", j + 1);
-      prg[i].fbo[j].vid_size_v = cgGetNamedParameter(prg[i].vprg, attr_buf);
-      prg[i].fbo[j].vid_size_f = cgGetNamedParameter(prg[i].fprg, attr_buf);
-
-      snprintf(attr_buf, sizeof(attr_buf), "PASS%u.texture_size", j + 1);
-      prg[i].fbo[j].tex_size_v = cgGetNamedParameter(prg[i].vprg, attr_buf);
-      prg[i].fbo[j].tex_size_f = cgGetNamedParameter(prg[i].fprg, attr_buf);
-
-      snprintf(attr_buf, sizeof(attr_buf), "PASS%u.tex_coord", j + 1);
-      prg[i].fbo[j].coord = cgGetNamedParameter(prg[i].vprg, attr_buf);
+      char pass_str[64];
+      snprintf(pass_str, sizeof(pass_str), "PASS%u", j + 1);
+      set_pass_attrib(&prg[i], &prg[i].fbo[j], pass_str);
+      snprintf(pass_str, sizeof(pass_str), "PASSPREV%u", i - j); 
+      set_pass_attrib(&prg[i], &prg[i].fbo[j], pass_str);
    }
 }
 
-static bool gl_cg_init(const char *path)
+static bool gl_cg_init(void *data, const char *path)
 {
+   unsigned i;
+   (void)data;
 #ifdef HAVE_CG_RUNTIME_COMPILER
    cgRTCgcInit();
 #endif
@@ -785,7 +829,7 @@ static bool gl_cg_init(const char *path)
       RARCH_ERR("Invalid profile type\n");
       goto error;
    }
-#ifndef HAVE_RGL
+#ifndef HAVE_GCMGL
    RARCH_LOG("[Cg]: Vertex profile: %s\n", cgGetProfileString(cgVProf));
    RARCH_LOG("[Cg]: Fragment profile: %s\n", cgGetProfileString(cgFProf));
 #endif
@@ -805,8 +849,8 @@ static bool gl_cg_init(const char *path)
          goto error;
    }
 
-   prg[0].mvp = cgGetNamedParameter(prg[0].vprg, "modelViewProj");
-   for (unsigned i = 1; i <= cg_shader->passes; i++)
+   prg[0].mvp = cgGetNamedParameter(prg[0].vprg, "IN.mvp_matrix");
+   for (i = 1; i <= cg_shader->passes; i++)
       set_program_attributes(i);
 
    // If we aren't using last pass non-FBO shader, 
@@ -829,8 +873,10 @@ error:
    return false;
 }
 
-static void gl_cg_use(unsigned index)
+static void gl_cg_use(void *data, unsigned index)
 {
+   (void)data;
+
    if (cg_active && prg[index].vprg && prg[index].fprg)
    {
       gl_cg_reset_attrib();
@@ -862,12 +908,35 @@ static bool gl_cg_filter_type(unsigned index, bool *smooth)
       return false;
 }
 
+static enum gfx_wrap_type gl_cg_wrap_type(unsigned index)
+{
+   if (cg_active && index)
+      return cg_shader->pass[index - 1].wrap;
+   else
+      return RARCH_WRAP_BORDER;
+}
+
 static void gl_cg_shader_scale(unsigned index, struct gfx_fbo_scale *scale)
 {
    if (cg_active && index)
       *scale = cg_shader->pass[index - 1].fbo;
    else
       scale->valid = false;
+}
+
+static unsigned gl_cg_get_prev_textures(void)
+{
+   unsigned i, j;
+   if (!cg_active)
+      return 0;
+
+   unsigned max_prev = 0;
+   for (i = 1; i <= cg_shader->passes; i++)
+      for (j = 0; j < PREV_TEXTURES; j++)
+         if (prg[i].prev[j].tex)
+            max_prev = max(j + 1, max_prev);
+
+   return max_prev;
 }
 
 void gl_cg_set_compiler_args(const char **argv)
@@ -887,9 +956,11 @@ const gl_shader_backend_t gl_cg_backend = {
    gl_cg_use,
    gl_cg_num,
    gl_cg_filter_type,
+   gl_cg_wrap_type,
    gl_cg_shader_scale,
    gl_cg_set_coords,
    gl_cg_set_mvp,
+   gl_cg_get_prev_textures,
 
    RARCH_SHADER_CG,
 };

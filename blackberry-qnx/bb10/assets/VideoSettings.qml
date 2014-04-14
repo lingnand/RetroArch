@@ -1,4 +1,5 @@
 import bb.cascades 1.0
+import bb.system 1.0
 
 Page
 {
@@ -9,11 +10,18 @@ Page
        
     }
     
+    
+    
     actions: [
         ActionItem {
             title: "Save"
             ActionBar.placement: ActionBarPlacement.OnBar
             imageSource: "asset:///images/file.png"
+            attachedObjects: [
+                SystemToast {
+                    id: settingsToast
+                    body: "Settings saved successfully."
+                }]
             onTriggered: {
                 if (dropdown_orient.selectedIndex == 0)
                 {
@@ -23,6 +31,10 @@ Page
                 {
                     RetroArch.updateOptions("orientation", "landscape");
                 }
+                
+                settingsToast.show();
+                
+                
             }
         }
     ]

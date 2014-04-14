@@ -1,5 +1,5 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -32,7 +32,7 @@ typedef struct rarch_cmd rarch_cmd_t;
 rarch_cmd_t *rarch_cmd_new(bool stdin_enable, bool network_enable, uint16_t port);
 void rarch_cmd_free(rarch_cmd_t *handle);
 
-void rarch_cmd_pre_frame(rarch_cmd_t *handle);
+void rarch_cmd_poll(rarch_cmd_t *handle);
 void rarch_cmd_set(rarch_cmd_t *handle, unsigned id);
 bool rarch_cmd_get(rarch_cmd_t *handle, unsigned id);
 

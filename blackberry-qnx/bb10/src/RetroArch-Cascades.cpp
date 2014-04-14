@@ -16,16 +16,14 @@
 #include "../../../general.h"
 #include "../../../conf/config_file.h"
 #include "../../../file.h"
-#include "../../../core_info.h"
-#include "../../../driver.h"
-#include "settings.h"
+#include "../../../frontend/info/core_info.h"
 
 #ifdef HAVE_RGUI
-#include "../../frontend/menu/rgui.h"
+#include "../../../frontend/menu/menu_common.h"
 #endif
 
 #include "../../frontend_qnx.h"
-#include "settings.h"
+
 #include <bb/cascades/AbsoluteLayoutProperties>
 #include <bb/cascades/ForeignWindowControl>
 #include <bb/cascades/AbstractPane>
@@ -34,8 +32,8 @@
 #include <bb/cascades/pickers/FilePicker>
 #include <bb/data/JsonDataAccess>
 #include <bb/device/HardwareInfo>
-#include <bb/device/DisplayInfo>
 #include <bb/cascades/ListView>
+#include <bb/device/DisplayInfo>
 
 
 #include <screen/screen.h>
@@ -47,13 +45,11 @@
 #include <dirent.h>
 #include <bb/cascades/DropDown>
 
+#include "settings.h"
+
 using namespace bb::cascades;
 using namespace bb::data;
 using namespace bb::device;
-
-extern screen_window_t screen_win;
-extern screen_context_t screen_ctx;
-
 
 OrientationSupport *support;
 int deviceAngle;
@@ -65,9 +61,17 @@ DisplayInfo display;
 QString devOrientation = "null";
 Settings *appSettings;
 
+
+
+using namespace bb::cascades;
+using namespace bb::data;
+using namespace bb::device;
+
+extern screen_window_t screen_win;
+extern screen_context_t screen_ctx;
+
 RetroArch::RetroArch()
 {
-
    qmlRegisterType<bb::cascades::pickers::FilePicker>("bb.cascades.pickers", 1, 0, "FilePicker");
    qmlRegisterUncreatableType<bb::cascades::pickers::FileType>("bb.cascades.pickers", 1, 0, "FileType", "");
 
@@ -76,19 +80,33 @@ RetroArch::RetroArch()
    coid = ConnectAttach(0, 0, chid, _NTO_SIDE_CHANNEL, 0);
    support = OrientationSupport::instance();
 
-   bool res = connect(
-         support, SIGNAL(rotationCompleted()),
+   // If first run, copy over native assets to data
+   QString dataDir = QString::fromStdString("data");
+   QString config = QString::fromStdString("app/native/retroarch.cfg");
+
+   dataDir.append("/retroarch.cfg");
+
+
+   if (!QFile::exists(dataDir)) {
+	   QFile::copy(config, dataDir);
+   }
+
+   connect(
+         OrientationSupport::instance(), SIGNAL(rotationCompleted()),
          this, SLOT(onRotationCompleted()));
 
    doSettings();
 
-
    rarch_main_clear_state();
-   strlcpy(g_extern.config_path, "app/native/retroarch.cfg", sizeof(g_extern.config_path));
+   strlcpy(g_extern.config_path, "data/retroarch.cfg", sizeof(g_extern.config_path));
    config_load();
 
    strlcpy(g_settings.libretro, "app/native/lib", sizeof(g_settings.libretro));
+   strlcpy(g_settings.video.shader_dir, "data/shaders_glsl", sizeof(g_settings.video.shader_dir));
+   strlcpy(g_settings.video.filter_path, "app/native/shaders_glsl", sizeof(g_settings.video.filter_path));
+   strlcpy(g_settings.libretro_info_path, "app/native/info", sizeof(g_settings.libretro_info_path));
    coreSelectedIndex = -1;
+
 
    //Stop config overwritting values
    g_extern.block_config_read = true;
@@ -106,14 +124,13 @@ RetroArch::RetroArch()
          //Get core DropDown reference to populate it in C++
          coreSelection = mAppPane->findChild<DropDown*>("dropdown_core");
          connect(coreSelection, SIGNAL(selectedValueChanged(QVariant)), this, SLOT(onCoreSelected(QVariant)));
-         core_info_list = get_core_info_list(g_settings.libretro);
+         core_info_list = core_info_list_new(g_settings.libretro);
          populateCores(core_info_list);
 
          Application::instance()->setScene(mAppPane);
 
          screen_create_context(&screen_ctx, 0);
          input_qnx.init();
-
          buttonMap = new ButtonMap(screen_ctx, (const char*)Application::instance()->mainWindow()->groupId().toAscii().constData(), coid);
          qml->setContextProperty("ButtonMap", buttonMap);
 
@@ -131,6 +148,7 @@ RetroArch::RetroArch()
          }
 
          mAppPane->findChild<DropDown*>("dropdown_orientation")->setProperty("selectedIndex", index);
+         // Start the thread in which we render to the custom window.
          start();
       }
    }
@@ -138,7 +156,7 @@ RetroArch::RetroArch()
 
 RetroArch::~RetroArch()
 {
-   free_core_info_list(core_info_list);
+   core_info_list_free(core_info_list);
 }
 
 void RetroArch::aboutToQuit()
@@ -150,6 +168,29 @@ void RetroArch::aboutToQuit()
    MsgSend(coid, (void*)&msg, sizeof(msg), (void*)NULL, 0);
 
    wait();
+}
+
+void RetroArch::recurseAddDir(QDir d, QStringList & list) {
+
+    QStringList qsl = d.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Files);
+
+    foreach (QString file, qsl) {
+
+        QFileInfo finfo(QString("%1/%2").arg(d.path()).arg(file));
+
+        if (finfo.isSymLink())
+            return;
+
+        if (finfo.isDir()) {
+
+            QString dirname = finfo.fileName();
+            QDir sd(finfo.filePath());
+
+            recurseAddDir(sd, list);
+
+        } else
+            list << QDir::toNativeSeparators(finfo.filePath());
+    }
 }
 
 void RetroArch::run()
@@ -174,7 +215,6 @@ void RetroArch::run()
       RARCH_ERR("navigator_location_lock failed.\n");
    }
 
-
    while (true)
    {
       rcvid = MsgReceive(chid, &msg, sizeof(msg), 0);
@@ -187,25 +227,22 @@ void RetroArch::run()
          {
             MsgReply(rcvid,0,NULL,0);
 
-            QByteArray groupArr =
-                           Application::instance()->mainWindow()->groupId().toAscii();
-
-
-
             if (screen_create_window_type(&screen_win, screen_ctx, SCREEN_CHILD_WINDOW) != BPS_SUCCESS)
             {
                RARCH_ERR("Screen create window failed.\n");
             }
-            char *win_id = "RetroArch_Emulator_Window";
-               screen_set_window_property_cv(screen_win, SCREEN_PROPERTY_ID_STRING, strlen(win_id), win_id);
-
-               int z = 10;
-            if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_ZORDER, &z) != 0) {
-                  return;
+            if (screen_join_window_group(screen_win, (const char*)Application::instance()->mainWindow()->groupId().toAscii().constData()) != BPS_SUCCESS)
+            {
+               RARCH_ERR("Screen join window group failed.\n");
             }
 
-            screen_join_window_group(screen_win, (const char *)groupArr.constData());
+            char *win_id = "RetroArch_Emulator_Window";
+            screen_set_window_property_cv(screen_win, SCREEN_PROPERTY_ID_STRING, strlen(win_id), win_id);
 
+            int z = 10;
+            if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_ZORDER, &z) != 0) {
+               return;
+            }
 
             initRASettings();
 
@@ -213,7 +250,6 @@ void RetroArch::run()
             Application::instance()->exit();
             break;
          }
-
          //The class should probably be it's own QThread, simplify things
          case RETROARCH_BUTTON_MAP:
             MsgReply(rcvid, buttonMap->mapNextButtonPressed(), NULL, 0);
@@ -264,61 +300,64 @@ QString RetroArch::getRomExtensions()
  */
 void RetroArch::onRotationCompleted()
 {
+   if (OrientationSupport::instance()->orientation() == UIOrientation::Landscape)
+   {
 
-	if(support->displayDirection() == DisplayDirection::North)
-		{
-			deviceAngle = 0;
-			size[0] = display.pixelSize().width();
-			size[1] = display.pixelSize().height();
+	   if(support->displayDirection() == DisplayDirection::North)
+	   {
+	   		deviceAngle = 0;
+	   		size[0] = display.pixelSize().width();
+	   		size[1] = display.pixelSize().height();
 
-		}
+	   	}
 
-		else if (support->displayDirection() == DisplayDirection::South)
-		{
-			deviceAngle = 180;
-			size[0] = display.pixelSize().width();
-			size[1] = display.pixelSize().height();
+	   	else if (support->displayDirection() == DisplayDirection::South)
+	   	{
+	   		deviceAngle = 180;
+	   		size[0] = display.pixelSize().width();
+	   		size[1] = display.pixelSize().height();
 
-		}
+	   	}
 
-		else if (support->displayDirection() == DisplayDirection::East)
-		{
-			deviceAngle = 0;
-			size[1] = display.pixelSize().width();
-			size[0] = display.pixelSize().height();
+	   	else if (support->displayDirection() == DisplayDirection::East)
+	   	{
+	   		deviceAngle = 0;
+	   		size[1] = display.pixelSize().width();
+	   		size[0] = display.pixelSize().height();
 
-		}
+	   	}
 
-		else if (support->displayDirection() == DisplayDirection::West)
-		{
+	   	else if (support->displayDirection() == DisplayDirection::West)
+	   	{
 
-			deviceAngle = 0;
-			size[1] = display.pixelSize().width();
-			size[0] = display.pixelSize().height();
+	   		deviceAngle = 0;
+	   		size[1] = display.pixelSize().width();
+	   		size[0] = display.pixelSize().height();
 
-		}
-
-
-		if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_SIZE, size) != 0) {
-			return;
-		}
+	   	}
 
 
-		if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_ROTATION, &deviceAngle) != 0)
-		{
-			return;
-	    }
+	  if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_SIZE, size) != 0) {
+		  return;
+	  }
+
+
+	  if (screen_set_window_property_iv(screen_win, SCREEN_PROPERTY_ROTATION, &deviceAngle) != 0)
+	  {
+		  return;
+	  }
 
       if (state == RETROARCH_START_REQUESTED)
       {
-
          startEmulator();
       }
+   }
 }
 
 void RetroArch::onCoreSelected(QVariant value)
 {
    coreSelectedIndex = value.toInt();
+
    core.clear();
    core.append(core_info_list->list[coreSelectedIndex].path);
    emit coreChanged(core);
@@ -336,23 +375,21 @@ void RetroArch::onCoreSelected(QVariant value)
  */
 void RetroArch::startEmulator()
 {
-		OrientationHack();
+	setOrientation();
+    state = RETROARCH_START_REQUESTED;
 
-	   state = RETROARCH_START_REQUESTED;
+      recv_msg msg;
+      msg.code = RETROARCH_START_REQUESTED;
 
-	      recv_msg msg;
-	      msg.code = RETROARCH_START_REQUESTED;
+      MsgSend(coid, (void*)&msg, sizeof(msg), (void*)NULL, 0);
 
-	      MsgSend(coid, (void*)&msg, sizeof(msg), (void*)NULL, 0);
-
-	      state = RETROARCH_RUNNING;
-
-
+      state = RETROARCH_RUNNING;
+   //}
 }
 
 void RetroArch::populateCores(core_info_list_t * info)
 {
-   int i;
+   unsigned int i;
    Option *tmp;
 
    //Populate DropDown
@@ -371,10 +408,11 @@ void RetroArch::findDevices()
 {
    //Find all connected devices.
    Option *tmp;
+
    deviceSelection->removeAll();
 
    //Populate DropDown
-   for (int i = 0; i < pads_connected; ++i)
+   for (unsigned int i = 0; i < pads_connected; ++i)
    {
       tmp = Option::create().text(devices[i].device_name)
                             .value(i);
@@ -405,19 +443,21 @@ void RetroArch::initRASettings()
    strlcpy(g_extern.fullpath, (char *)rom.toAscii().constData(), sizeof(g_extern.fullpath));
 
    HardwareInfo *hwInfo = new HardwareInfo();
+
    //If Physical keyboard or a device mapped to player 1, hide overlay
    //TODO: Should there be a minimized/quick settings only overlay?
    if(hwInfo->isPhysicalKeyboardDevice() || port_device[0])
       *g_settings.input.overlay = '\0';
 }
 
-
-void RetroArch::OrientationHack()
+void RetroArch::setOrientation()
 {
 
 	if(devOrientation == "portrait")
 	{
 		support->setSupportedDisplayOrientation(SupportedDisplayOrientation::DisplayPortrait);
+		g_extern.lifecycle_state |= (1ULL << RARCH_OVERLAY_NEXT);
+		g_settings.input.overlay_scale = 1.0f;
 	}
 
 	else if(devOrientation == "landscape" && display.pixelSize().width() != display.pixelSize().height())
@@ -506,3 +546,4 @@ void RetroArch::doSettings()
 	   }
 
 }
+

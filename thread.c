@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2013 - Hans-Kristian Arntzen
+ *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2014 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -83,6 +84,13 @@ sthread_t *sthread_create(void (*thread_func)(void*), void *userdata)
    return thread;
 }
 
+int sthread_detach(sthread_t *thread)
+{
+   CloseHandle(thread->thread);
+   free(thread);
+   return 0;
+}
+
 void sthread_join(sthread_t *thread)
 {
    WaitForSingleObject(thread->thread, INFINITE);
@@ -157,7 +165,7 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    WaitForSingleObject(cond->event, 0);
    slock_unlock(lock);
 
-   DWORD res = WaitForSingleObject(cond->event, timeout_us / 1000);
+   DWORD res = WaitForSingleObject(cond->event, (DWORD)(timeout_us) / 1000);
 
    slock_lock(lock);
    return res == WAIT_OBJECT_0;
@@ -166,6 +174,13 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
 void scond_signal(scond_t *cond)
 {
    SetEvent(cond->event);
+}
+
+/* FIXME - check how this function should differ from scond_signal implementation */
+int scond_broadcast(scond_t *cond)
+{
+   SetEvent(cond->event);
+   return 0;
 }
 
 void scond_free(scond_t *cond)
@@ -213,6 +228,11 @@ sthread_t *sthread_create(void (*thread_func)(void*), void *userdata)
    }
 
    return thr;
+}
+
+int sthread_detach(sthread_t *thread)
+{
+   return pthread_detach(thread->id);
 }
 
 void sthread_join(sthread_t *thread)
@@ -288,10 +308,14 @@ void scond_wait(scond_t *cond, slock_t *lock)
    pthread_cond_wait(&cond->cond, &lock->lock);
 }
 
-#ifndef RARCH_CONSOLE
+int scond_broadcast(scond_t *cond)
+{
+   return pthread_cond_broadcast(&cond->cond);
+}
+
 bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
 {
-   struct timespec now;
+   struct timespec now = {0};
 
 #ifdef __MACH__ // OSX doesn't have clock_gettime ... :(
    clock_serv_t cclock;
@@ -301,7 +325,18 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    mach_port_deallocate(mach_task_self(), cclock);
    now.tv_sec = mts.tv_sec;
    now.tv_nsec = mts.tv_nsec;
-#else
+#elif defined(__CELLOS_LV2__)
+   sys_time_sec_t s;
+   sys_time_nsec_t n;
+   sys_time_get_current_time(&s, &n);
+   now.tv_sec  = s;
+   now.tv_nsec = n;
+#elif defined(__mips__)
+   struct timeval tm;
+   gettimeofday(&tm, NULL);
+   now.tv_sec = tm.tv_sec;
+   now.tv_nsec = tm.tv_usec * 1000;
+#elif !defined(GEKKO) // timeout on libogc is duration, not end time
    clock_gettime(CLOCK_REALTIME, &now);
 #endif
 
@@ -314,7 +349,6 @@ bool scond_wait_timeout(scond_t *cond, slock_t *lock, int64_t timeout_us)
    int ret = pthread_cond_timedwait(&cond->cond, &lock->lock, &now);
    return ret == 0;
 }
-#endif
 
 void scond_signal(scond_t *cond)
 {
