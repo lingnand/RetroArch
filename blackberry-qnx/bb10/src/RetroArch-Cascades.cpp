@@ -36,6 +36,7 @@
 #include <bb/device/DisplayInfo>
 
 
+
 #include <screen/screen.h>
 #include <bps/screen.h>
 #include <bps/navigator.h>
@@ -59,6 +60,7 @@ int sourceSize[2];
 DisplayInfo display;
 
 QString devOrientation = "null";
+QString syspath = "null";
 Settings *appSettings;
 
 
@@ -111,6 +113,7 @@ RetroArch::RetroArch()
    //Stop config overwritting values
    g_extern.block_config_read = true;
 
+
    QmlDocument *qml = QmlDocument::create("asset:///main.qml");
 
    if (!qml->hasErrors())
@@ -142,12 +145,25 @@ RetroArch::RetroArch()
          mAppPane->findChild<ListView*>("buttonMapList")->setDataModel(buttonMap->buttonDataModel);
 
          int index = 0;
-         // Start the thread in which we render to the custom window.
+
          if(devOrientation == "landscape") {
         	 index = 1;
          }
 
          mAppPane->findChild<DropDown*>("dropdown_orientation")->setProperty("selectedIndex", index);
+
+         QString substring = syspath.mid(syspath.lastIndexOf("/"));
+         QString midstring = syspath.mid(0,21);
+
+         if(midstring == "/accounts/1000/shared") {
+
+        	 mAppPane->findChild<DropDown*>("dropdown_sysFolderName")->setProperty("title", "device: " + substring);
+         }
+         else
+         {
+        	 mAppPane->findChild<DropDown*>("dropdown_sysFolderName")->setProperty("title", "sdcard: " + substring);
+         }
+
          // Start the thread in which we render to the custom window.
          start();
       }
@@ -520,11 +536,17 @@ void RetroArch::updateOptions(QString property, QString selected)
 	doSettings();
 }
 
+QString RetroArch::getOption(QString property)
+{
+	return appSettings->getValueFor(property, "null");
+}
+
 void RetroArch::doSettings()
 {
-	devOrientation = appSettings->getValueFor("orientation","null");
+	   devOrientation = appSettings->getValueFor("orientation","null");
 	   qDebug() << "orientation setting set to: " << devOrientation;
 
+	   syspath = appSettings->getValueFor("system_path", "null");
 
 	   if(devOrientation == "null")
 	   {
@@ -542,8 +564,19 @@ void RetroArch::doSettings()
 		   appSettings->saveValueFor((const QString)"orientation", devOrientation);
 		   qDebug() << "orientation initialized to: " << (const QString) devOrientation;
 
+		  }
 
+	   if(syspath == "null")
+	   {
+		    syspath = "/accounts/1000/shared/documents/roms/system";
+				   // default to within the roms folder
+
+			appSettings->saveValueFor((const QString)"system_path", syspath);
+		    qDebug() << "system path initialized to: " << (const QString) syspath;
 	   }
+
+	   strlcpy(g_settings.system_directory, syspath.toAscii(), sizeof(g_settings.system_directory));
+
 
 }
 

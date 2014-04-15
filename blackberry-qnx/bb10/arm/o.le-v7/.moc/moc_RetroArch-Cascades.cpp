@@ -22,8 +22,8 @@ static const uint qt_meta_data_RetroArch[] = {
        6,       // revision
        0,       // classname
        0,    0, // classinfo
-      10,   14, // methods
-       3,   64, // properties
+      11,   14, // methods
+       3,   69, // properties
        0,    0, // enums/sets
        0,    0, // constructors
        0,       // flags
@@ -44,11 +44,12 @@ static const uint qt_meta_data_RetroArch[] = {
      159,   10,   10,   10, 0x02,
      180,  173,   10,   10, 0x02,
      222,  204,   10,   10, 0x02,
+     270,  261,  253,   10, 0x02,
 
  // properties: name, type, flags
-     261,  253, 0x0a495103,
-     265,  253, 0x0a495103,
-     270,  253, 0x0a495001,
+     289,  253, 0x0a495103,
+     293,  253, 0x0a495103,
+     298,  253, 0x0a495001,
 
  // properties: notify_signal_id
        0,
@@ -65,7 +66,8 @@ static const char qt_meta_stringdata_RetroArch[] = {
     "onCoreSelected(QVariant)\0startEmulator()\0"
     "findDevices()\0player\0discoverController(int)\0"
     "property,selected\0updateOptions(QString,QString)\0"
-    "QString\0rom\0core\0romExtensions\0"
+    "QString\0property\0getOption(QString)\0"
+    "rom\0core\0romExtensions\0"
 };
 
 void RetroArch::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
@@ -84,6 +86,8 @@ void RetroArch::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, v
         case 7: _t->findDevices(); break;
         case 8: _t->discoverController((*reinterpret_cast< int(*)>(_a[1]))); break;
         case 9: _t->updateOptions((*reinterpret_cast< QString(*)>(_a[1])),(*reinterpret_cast< QString(*)>(_a[2]))); break;
+        case 10: { QString _r = _t->getOption((*reinterpret_cast< QString(*)>(_a[1])));
+            if (_a[0]) *reinterpret_cast< QString*>(_a[0]) = _r; }  break;
         default: ;
         }
     }
@@ -121,9 +125,9 @@ int RetroArch::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 10)
+        if (_id < 11)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 10;
+        _id -= 11;
     }
 #ifndef QT_NO_PROPERTIES
       else if (_c == QMetaObject::ReadProperty) {

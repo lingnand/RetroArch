@@ -10,6 +10,13 @@ TabbedPane {
 
         }
     }
+    Tab { 
+        title: "General"
+        General
+        {
+            
+        }
+    }
     Tab {
         title: "Input"
         Controllers

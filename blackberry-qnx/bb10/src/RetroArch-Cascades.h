@@ -37,6 +37,7 @@ public:
     Q_INVOKABLE void findDevices();
     Q_INVOKABLE void discoverController(int player);
     Q_INVOKABLE void updateOptions(QString property, QString selected);
+    Q_INVOKABLE QString getOption(QString property);
     void populateCores(core_info_list_t * info);
 
 signals:
@@ -71,6 +72,7 @@ private:
 
 	void doSettings();
 	void setOrientation();
+
 
 	void initRASettings();
 

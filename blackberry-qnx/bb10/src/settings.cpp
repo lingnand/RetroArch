@@ -34,13 +34,16 @@ QString Settings::getValueFor(const QString &objectName,
 	if (settings.value(objectName).isNull()) {
 		return defaultValue;
 	}
+	qDebug() << "get: " << settings.value(objectName).toString();
 	return settings.value(objectName).toString();
+
 }
 
 void Settings::saveValueFor(const QString &objectName,
 		const QString &inputValue) {
 	QSettings settings("RetroArch", "RetroArch");
 	settings.setValue(objectName, QVariant(inputValue));
+	qDebug() << objectName << "is set to: " << inputValue;
 }
 
 
