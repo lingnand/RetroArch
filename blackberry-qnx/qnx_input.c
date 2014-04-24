@@ -14,13 +14,13 @@
  *  You should have received a copy of the GNU General Public License along with RetroArch.
  *  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "../general.h"
 #include "../driver.h"
 #include <screen/screen.h>
 #include <bps/event.h>
 #include <bps/navigator.h>
 #include <sys/keycodes.h>
+
 
 #include "frontend_qnx.h"
 
@@ -29,6 +29,7 @@
 #else
 #define MAX_TOUCH 4
 #endif
+
 
 struct touches
 {
@@ -55,6 +56,7 @@ static void qnx_input_autodetect_gamepad(input_device_t* controller);
 static void initController(input_device_t* controller);
 
 #ifdef HAVE_BB10
+
 static void process_gamepad_event(screen_event_t screen_event, int type)
 {
    screen_device_t device;
@@ -209,10 +211,10 @@ static void qnx_input_autodetect_gamepad(input_device_t* controller)
       controller->device = DEVICE_KEYBOARD;
       strlcpy(controller->device_name, "BlackBerry BT Keyboard", sizeof(controller->device_name));
    }
-   else if (strstr(controller->id, "qwerty:bb35"))
+   else if (strstr(controller->id, "qwerty"))
    {
       controller->device = DEVICE_KEYPAD;
-      strlcpy(controller->device_name, "BlackBerry Q10 Keypad", sizeof(controller->device_name));
+      strlcpy(controller->device_name, "BlackBerry Q Keypad", sizeof(controller->device_name));
    }
    else if (strstr(controller->id, "BB-VKB"))
    {
@@ -489,6 +491,7 @@ static void handle_navigator_event(bps_event_t *event)
                      g_extern.lifecycle_state |= (1ULL << RARCH_QUIT_KEY);
                      break;
                   }
+
                }
                break;
             case NAVIGATOR_WINDOW_FULLSCREEN:
@@ -759,23 +762,23 @@ static void qnx_input_set_keybinds(void *data, unsigned device, unsigned port,
             strlcpy(g_settings.input.device_names[port], "Unknown",
                sizeof(g_settings.input.device_names[port]));
             g_settings.input.device[port] = device;
-            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_B].def_joykey      = SCREEN_B_GAME_BUTTON;
-            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_Y].def_joykey      = SCREEN_Y_GAME_BUTTON;
+            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_B].def_joykey      = SCREEN_A_GAME_BUTTON;
+            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_Y].def_joykey      = SCREEN_X_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_SELECT].def_joykey = SCREEN_MENU1_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_START].def_joykey  = SCREEN_MENU2_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_UP].def_joykey     = SCREEN_DPAD_UP_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_DOWN].def_joykey   = SCREEN_DPAD_DOWN_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_LEFT].def_joykey   = SCREEN_DPAD_LEFT_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_RIGHT].def_joykey  = SCREEN_DPAD_RIGHT_GAME_BUTTON;
-            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_A].def_joykey      = SCREEN_A_GAME_BUTTON;
-            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_X].def_joykey      = SCREEN_X_GAME_BUTTON;
+            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_A].def_joykey      = SCREEN_B_GAME_BUTTON;
+            g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_X].def_joykey      = SCREEN_Y_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L].def_joykey      = SCREEN_L1_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R].def_joykey      = SCREEN_R1_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L2].def_joykey     = SCREEN_L2_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R2].def_joykey     = SCREEN_R2_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_L3].def_joykey     = SCREEN_L3_GAME_BUTTON;
             g_settings.input.binds[port][RETRO_DEVICE_ID_JOYPAD_R3].def_joykey     = SCREEN_R3_GAME_BUTTON;
-            g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = NO_BTN; //TODO: Find a good mappnig
+            g_settings.input.binds[port][RARCH_MENU_TOGGLE].def_joykey             = 0; //TODO: Find a good mappnig
             controller->port = port;
             port_device[port] = controller;
             break;

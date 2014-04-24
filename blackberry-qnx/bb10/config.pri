@@ -25,6 +25,19 @@ device {
     }
 }
 
+simulator {
+    CONFIG(debug, debug|release) {
+        SOURCES +=  $$quote($$BASEDIR/src/ButtonMap.cpp) \
+                 $$quote($$BASEDIR/src/RetroArch-Cascades.cpp) \
+                 $$quote($$BASEDIR/src/main.cpp) \
+                 $$quote($$BASEDIR/src/settings.cpp)
+
+        HEADERS +=  $$quote($$BASEDIR/src/ButtonMap.h) \
+                 $$quote($$BASEDIR/src/RetroArch-Cascades.h) \
+                 $$quote($$BASEDIR/src/settings.h)
+    }
+}
+
 INCLUDEPATH +=  $$quote($$BASEDIR/src)
 
 CONFIG += precompile_header

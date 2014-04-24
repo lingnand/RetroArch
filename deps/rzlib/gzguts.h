@@ -162,9 +162,9 @@
 /* values for gz_state how */
 #define LOOK 0      /* look for a gzip header */
 #define MODE_COPY 1      /* copy input directly */
-#define MODE_GZIP 2      /* decompress a gzip stream */
+#define MODE_GZIP 2      /* decompress \\a gzip stream */
 
-#if defined(__APPLE__) || defined(PSP)
+#if defined(__APPLE__) || defined(PSP) || defined(PLAYBOOKOS)
 struct gzFile_s
 {
     unsigned have;

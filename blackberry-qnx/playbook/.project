@@ -27,7 +27,7 @@
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.buildLocation</key>
-					<value>${workspace_loc:/RetroArch/Device-Debug}</value>
+					<value>${workspace_loc:/RetroArch/Device-Release}</value>
 				</dictionary>
 				<dictionary>
 					<key>org.eclipse.cdt.make.core.contents</key>
@@ -77,12 +77,12 @@
 		<link>
 			<name>overlays</name>
 			<type>2</type>
-			<locationURI>PARENT-2-PROJECT_LOC/media/overlays</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/bb10/overlays</locationURI>
 		</link>
 		<link>
 			<name>shaders_glsl</name>
 			<type>2</type>
-			<locationURI>PARENT-2-PROJECT_LOC/media/shaders_glsl</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/bb10/shaders_glsl</locationURI>
 		</link>
 		<link>
 			<name>src/griffin.c</name>

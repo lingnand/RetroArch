@@ -92,16 +92,17 @@ Page {
             id: picker
 
             property string selectedFile
-
+            objectName: "romdirpick"
             title: "Rom Selector"
             filter: { RetroArch.romExtensions.split("|") }
             type: FileType.Other
-            directories: ["/accounts/1000/shared/documents/roms"]
+            directories: { 
+                RetroArch.getOption('rompath') }
+
 
             onFileSelected: {
                 RetroArch.rom = selectedFiles[0];
                 selectedFile = RetroArch.rom.substr(RetroArch.rom.lastIndexOf('/')+1);
-                picker.directories = [RetroArch.rom.substr(0, RetroArch.rom.lastIndexOf('/'))];
             }
         }
     ]

@@ -22,7 +22,7 @@
 
     <!-- Fourth digit segment of the package version. First three segments are taken from the
          <versionNumber> element.  Must be an integer from 0 to 2^16-1 -->
-    <buildId>6</buildId>
+    <buildId>9</buildId>
     <author>Justin Tokarchuk</author>
     <authorId>gYAAgPnNvvslFVmAHJwR3fmCPCc</authorId>
 
@@ -52,6 +52,10 @@
     <configuration name="Device-Profile">
        <platformArchitecture>armle-v7</platformArchitecture>
        <asset path="arm-p/o.le-v7-g/RetroArch-Cascades" entry="true" type="Qnx/Elf">RetroArch-Cascades</asset>
+    </configuration>
+        <configuration name="Simulator-Debug">
+       <platformArchitecture>x86</platformArchitecture>
+       <asset path="x86/o-g/test" entry="true" type="Qnx/Elf">test</asset>
     </configuration>
 
     <!--  The icon for the application, which should be 114x114. -->
@@ -83,6 +87,7 @@
     <permission system="true">run_native</permission>
     <permission>access_shared</permission>
     <permission>use_gamepad</permission>
+    <permission>read_device_identifying_information</permission>
     <env var="LD_LIBRARY_PATH" value="app/native/lib:/usr/lib/qt4/lib"/>
 
 

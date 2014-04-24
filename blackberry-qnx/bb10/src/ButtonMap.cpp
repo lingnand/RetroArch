@@ -8,6 +8,8 @@
 #include "../../../input/input_common.h"
 #include "../../frontend_qnx.h"
 
+bool overlayDisplay = true;
+
 ButtonMap::ButtonMap(screen_context_t screen_ctx, QString groupId, int coid)
 {
    this->screen_cxt = screen_ctx;
@@ -103,6 +105,23 @@ int ButtonMap::mapNextButtonPressed()
       if (event)
       {
          int domain = bps_event_get_domain(event);
+         int events = bps_event_get_code(event);
+
+         if (events == NAVIGATOR_SWIPE_DOWN)
+         {
+        	 if(overlayDisplay)
+        	 {
+        		 *g_settings.input.overlay = '\1';
+        	 }
+
+        	 else
+        	 {
+        		 *g_settings.input.overlay = '\1';
+        	 }
+
+        	 overlayDisplay = !overlayDisplay;
+
+         }
 
          if (domain == screen_get_domain())
          {

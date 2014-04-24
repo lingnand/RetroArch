@@ -61,13 +61,21 @@ DisplayInfo display;
 
 QString devOrientation = "null";
 QString syspath = "null";
+QString rompath = "null";
 Settings *appSettings;
+QmlDocument *qml;
+AbstractPane *mAppPane;
+bool appsetup = false;
+
 
 
 
 using namespace bb::cascades;
 using namespace bb::data;
 using namespace bb::device;
+using namespace bb::cascades::pickers;
+
+FilePicker *rompicker;
 
 extern screen_window_t screen_win;
 extern screen_context_t screen_ctx;
@@ -114,13 +122,13 @@ RetroArch::RetroArch()
    g_extern.block_config_read = true;
 
 
-   QmlDocument *qml = QmlDocument::create("asset:///main.qml");
+   qml = QmlDocument::create("asset:///main.qml");
 
    if (!qml->hasErrors())
    {
       qml->setContextProperty("RetroArch", this);
 
-      AbstractPane *mAppPane = qml->createRootObject<AbstractPane>();
+      mAppPane = qml->createRootObject<AbstractPane>();
 
       if (mAppPane)
       {
@@ -164,7 +172,23 @@ RetroArch::RetroArch()
         	 mAppPane->findChild<DropDown*>("dropdown_sysFolderName")->setProperty("title", "sdcard: " + substring);
          }
 
+
+         substring = rompath.mid(rompath.lastIndexOf("/"));
+         midstring = rompath.mid(0,21);
+
+                  if(midstring == "/accounts/1000/shared") {
+
+                 	 mAppPane->findChild<DropDown*>("dropdown_romFolderName")->setProperty("title", "device: " + substring);
+                  }
+                  else
+                  {
+                 	 mAppPane->findChild<DropDown*>("dropdown_romFolderName")->setProperty("title", "sdcard: " + substring);
+                  }
+
+         mAppPane->findChild<FilePicker*>("romdirpick")->setDirectories(QStringList(rompath));
+         rompicker =  mAppPane->findChild<FilePicker*>("romdirpick");
          // Start the thread in which we render to the custom window.
+         appsetup = true;
          start();
       }
    }
@@ -275,6 +299,7 @@ void RetroArch::run()
             goto exit;
          default:
             break;
+
          }
       }
    }
@@ -316,6 +341,10 @@ QString RetroArch::getRomExtensions()
  */
 void RetroArch::onRotationCompleted()
 {
+
+	if(state == RETROARCH_RUNNING && g_settings.input.overlay_opacity == 0.0)
+		g_settings.input.overlay_opacity = 0.5;
+
    if (OrientationSupport::instance()->orientation() == UIOrientation::Landscape)
    {
 
@@ -463,7 +492,7 @@ void RetroArch::initRASettings()
    //If Physical keyboard or a device mapped to player 1, hide overlay
    //TODO: Should there be a minimized/quick settings only overlay?
    if(hwInfo->isPhysicalKeyboardDevice() || port_device[0])
-      *g_settings.input.overlay = '\0';
+      g_settings.input.overlay_opacity = 0;
 }
 
 void RetroArch::setOrientation()
@@ -533,6 +562,7 @@ void RetroArch::setOrientation()
 void RetroArch::updateOptions(QString property, QString selected)
 {
 	appSettings->saveValueFor(property, selected);
+
 	doSettings();
 }
 
@@ -547,6 +577,9 @@ void RetroArch::doSettings()
 	   qDebug() << "orientation setting set to: " << devOrientation;
 
 	   syspath = appSettings->getValueFor("system_path", "null");
+
+	   rompath = appSettings->getValueFor("rom_path", "null");
+
 
 	   if(devOrientation == "null")
 	   {
@@ -577,6 +610,20 @@ void RetroArch::doSettings()
 
 	   strlcpy(g_settings.system_directory, syspath.toAscii(), sizeof(g_settings.system_directory));
 
+	   if(rompath == "null")
+	   {
+	 		rompath = "/accounts/1000/shared/documents/roms";
+	 		// default to within the roms folder
+
+	 		appSettings->saveValueFor((const QString)"rom_path", rompath);
+	 		qDebug() << "rom path initialized to: " << (const QString) rompath;
+	   }
+
+	   if(appsetup)
+	   {
+		   rompicker->setDirectories(QStringList(rompath));
+	   }
 
 }
+
 

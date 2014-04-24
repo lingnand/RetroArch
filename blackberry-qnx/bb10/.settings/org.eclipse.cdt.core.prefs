@@ -1,0 +1,9 @@
+eclipse.preferences.version=1
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/CPULIST/delimiter=;
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/CPULIST/operation=append
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/CPULIST/value=x86
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/VARIANTLIST/delimiter=;
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/VARIANTLIST/operation=append
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/VARIANTLIST/value=g
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/append=true
+environment/project/com.qnx.qcc.toolChain.414809724.1850980744/appendContributed=true

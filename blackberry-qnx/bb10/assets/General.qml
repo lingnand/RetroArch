@@ -70,7 +70,7 @@ Page
                     objectName: "dropdown_sysFolderName"
                     verticalAlignment: VerticalAlignment.Center
                     horizontalAlignment: HorizontalAlignment.Center
-                    preferredWidth: 600
+                    preferredWidth: 500
                     enabled: false
                     title: if(picker.selectedFolder)
                         picker.selectedFolder
@@ -86,6 +86,45 @@ Page
                     }
                 }
             }
+                
+            Label {
+                text: "ROM Home Path"
+                layoutProperties: StackLayoutProperties {}
+            }
+            
+            
+            Container 
+            {
+                topPadding: 10
+                horizontalAlignment: HorizontalAlignment.Center
+                layout: StackLayout 
+                
+                {
+                    orientation: LayoutOrientation.LeftToRight
+                }
+                DropDown
+                {
+                    id: folderName2
+                    objectName: "dropdown_romFolderName"
+                    verticalAlignment: VerticalAlignment.Center
+                    horizontalAlignment: HorizontalAlignment.Center
+                    preferredWidth: 500
+                    enabled: false
+                    title: if(picker2.selectedFolder)
+                        picker2.selectedFolder
+                    else
+                        "Folder"
+                }
+                
+                ImageButton {
+                    horizontalAlignment: HorizontalAlignment.Right
+                    defaultImageSource: "asset:///images/file.png"
+                    onClicked: {
+                        picker2.open();
+                    }
+                }
+            }    
+                
         }
     }
     attachedObjects: [
@@ -112,6 +151,33 @@ Page
                 selectedFolder += selectedFiles[0].substr(selectedFiles[0].lastIndexOf("/"));
                 RetroArch.updateOptions("system_path", selectedFiles[0]);             
              }
+            },
+        
+            FilePicker {
+                id: picker2
+                            
+                property string selectedFolder
+                            
+                title: "ROM Home Directory"
+                mode: FilePickerMode.SaverMultiple
+                
+                            
+                            
+                onFileSelected: {
+                    if(selectedFiles[0].substr(0, 21) == "/accounts/1000/shared")
+                    {
+                        selectedFolder = "device: ";
+                    }
+                                
+                    else
+                    {
+                         selectedFolder = "sdcard: ";
+                                
+                    }
+                    selectedFolder += selectedFiles[0].substr(selectedFiles[0].lastIndexOf("/"));
+                    RetroArch.updateOptions("rom_path", selectedFiles[0]);   
+                              
+                }
             }
         ]
             

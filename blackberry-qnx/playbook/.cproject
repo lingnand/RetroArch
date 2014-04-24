@@ -27,10 +27,12 @@
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/usr/include/freetype2"/>
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/../target-override/usr/include"/>
 									<listOptionValue builtIn="false" value="../../../"/>
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
 								</option>
 								<option id="com.qnx.qcc.option.compiler.security.209097800" name="Enhanced Security (-fstack-protector-all)" superClass="com.qnx.qcc.option.compiler.security" value="false" valueType="boolean"/>
 								<option id="com.qnx.qcc.option.compiler.defines.1775248205" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE=2"/>
+									<listOptionValue builtIn="false" value="PLAYBOOKOS"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
 									<listOptionValue builtIn="false" value="HAVE_NEON"/>
@@ -41,9 +43,9 @@
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
-									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
 									<listOptionValue builtIn="false" value="__BLACKBERRY_QNX__"/>
 									<listOptionValue builtIn="false" value="HAVE_OPENGLES"/>
+									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
 									<listOptionValue builtIn="false" value="HAVE_OPENGLES2"/>
 									<listOptionValue builtIn="false" value="HAVE_NULLINPUT"/>
 									<listOptionValue builtIn="false" value="HAVE_AL"/>
@@ -67,6 +69,9 @@
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.722220103" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
 								<option id="com.qnx.qcc.option.assembler.debug.2023833959" name="Debug (-g)" superClass="com.qnx.qcc.option.assembler.debug" value="true" valueType="boolean"/>
+								<option id="com.qnx.qcc.option.assembler.includePath.1980031596" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
+								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.326906113" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.2091187444" name="QCC Linker" superClass="com.qnx.qcc.tool.linker">
@@ -149,10 +154,13 @@
 								<option id="com.qnx.qcc.option.compiler.includePath.1333983864" name="Include Directories (-I)" superClass="com.qnx.qcc.option.compiler.includePath" valueType="includePath">
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/usr/include/freetype2"/>
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/../target-override/usr/include"/>
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
 								</option>
 								<option id="com.qnx.qcc.option.compiler.security.421937377" name="Enhanced Security (-fstack-protector-all)" superClass="com.qnx.qcc.option.compiler.security" value="false" valueType="boolean"/>
 								<option id="com.qnx.qcc.option.compiler.defines.426935293" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_FORTIFY_SOURCE=2"/>
+									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
+									<listOptionValue builtIn="false" value="PLAYBOOKOS"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
 									<listOptionValue builtIn="false" value="HAVE_NEON"/>
@@ -187,6 +195,9 @@
 								<inputType id="com.qnx.qcc.inputType.compiler.472778173" superClass="com.qnx.qcc.inputType.compiler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.676105057" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
+								<option id="com.qnx.qcc.option.assembler.includePath.513994630" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
+								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.585345918" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.939866545" name="QCC Linker" superClass="com.qnx.qcc.tool.linker">
@@ -265,6 +276,7 @@
 								<option id="com.qnx.qcc.option.compiler.includePath.1145263849" name="Include Directories (-I)" superClass="com.qnx.qcc.option.compiler.includePath" valueType="includePath">
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/usr/include/freetype2"/>
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/../target-override/usr/include"/>
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
 								</option>
 								<option id="com.qnx.qcc.option.compiler.security.1305803908" name="Enhanced Security (-fstack-protector-all)" superClass="com.qnx.qcc.option.compiler.security" value="true" valueType="boolean"/>
 								<option id="com.qnx.qcc.option.compiler.defines.213513124" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
@@ -303,6 +315,9 @@
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.820786892" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
 								<option id="com.qnx.qcc.option.assembler.debug.1981772840" name="Debug (-g)" superClass="com.qnx.qcc.option.assembler.debug" value="true" valueType="boolean"/>
+								<option id="com.qnx.qcc.option.assembler.includePath.2023090787" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
+								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.1036437237" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.1612406011" name="QCC Linker" superClass="com.qnx.qcc.tool.linker">
@@ -382,6 +397,7 @@
 								<option id="com.qnx.qcc.option.compiler.includePath.2069434559" name="Include Directories (-I)" superClass="com.qnx.qcc.option.compiler.includePath" valueType="includePath">
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/usr/include/freetype2"/>
 									<listOptionValue builtIn="false" value="${QNX_TARGET}/../target-override/usr/include"/>
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
 								</option>
 								<option id="com.qnx.qcc.option.compiler.security.521807592" name="Enhanced Security (-fstack-protector-all)" superClass="com.qnx.qcc.option.compiler.security" value="true" valueType="boolean"/>
 								<option id="com.qnx.qcc.option.compiler.defines.1725725626" name="Defines (-D)" superClass="com.qnx.qcc.option.compiler.defines" valueType="definedSymbols">
@@ -420,6 +436,9 @@
 							</tool>
 							<tool id="com.qnx.qcc.tool.assembler.1771923802" name="QCC Assembler" superClass="com.qnx.qcc.tool.assembler">
 								<option id="com.qnx.qcc.option.assembler.debug.1595223019" name="Debug (-g)" superClass="com.qnx.qcc.option.assembler.debug" value="true" valueType="boolean"/>
+								<option id="com.qnx.qcc.option.assembler.includePath.541408559" name="Include Directories (-I)" superClass="com.qnx.qcc.option.assembler.includePath" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;C:\bbretro&quot;"/>
+								</option>
 								<inputType id="com.qnx.qcc.inputType.assembler.2129805542" superClass="com.qnx.qcc.inputType.assembler"/>
 							</tool>
 							<tool id="com.qnx.qcc.tool.linker.1942866882" name="QCC Linker" superClass="com.qnx.qcc.tool.linker">
