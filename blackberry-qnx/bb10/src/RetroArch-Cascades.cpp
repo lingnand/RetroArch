@@ -601,7 +601,7 @@ void RetroArch::doSettings()
 
 	   if(syspath == "null")
 	   {
-		    syspath = "/accounts/1000/shared/documents/roms/system";
+		    syspath = "/accounts/1000/removable/sdcard/ROMS/system";
 				   // default to within the roms folder
 
 			appSettings->saveValueFor((const QString)"system_path", syspath);
@@ -612,7 +612,7 @@ void RetroArch::doSettings()
 
 	   if(rompath == "null")
 	   {
-	 		rompath = "/accounts/1000/shared/documents/roms";
+	 		rompath = "/accounts/1000/removable/sdcard/ROMS";
 	 		// default to within the roms folder
 
 	 		appSettings->saveValueFor((const QString)"rom_path", rompath);

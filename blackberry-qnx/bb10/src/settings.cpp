@@ -5,7 +5,7 @@
  *      Author: Justin
  */
 
-#include "Settings.h"
+#include "settings.h"
 #include <bb/cascades/Application>
 #include <bb/cascades/ArrayDataModel>
 #include <bb/cascades/DropDown>

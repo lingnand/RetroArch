@@ -10,7 +10,7 @@ first: release
 install: release-install
 uninstall: release-uninstall
 MAKEFILE      = Makefile
-QMAKE         = c:/bbndk/host_10_2_0_15/win32/x86/usr/bin/qmake.exe
+QMAKE         = /opt/bbndk/host_10_3_0_2702/linux/x86/usr/bin/qmake
 DEL_FILE      = rm -f
 CHK_DIR_EXISTS= test -d
 MKDIR         = mkdir -p
@@ -63,77 +63,44 @@ debug-install: $(MAKEFILE).Debug FORCE
 debug-uninstall: $(MAKEFILE).Debug FORCE
 	$(MAKE) -f $(MAKEFILE).Debug uninstall
 
-Makefile: ../RetroArch-Cascades.pro  ../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/blackberry-armv7le-qcc/qmake.conf ../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/g++-base.conf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/g++-unix.conf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/unix.conf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/qcc-base.conf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/qcc-base-qnx.conf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/qconfig.pri \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/qt_functions.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/qt_config.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/qnx-armv7le-qcc/qmake.conf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/exclusive_builds.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/default_pre.prf \
-		../config.pri \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/release.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/debug_and_release.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/default_post.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/cascades10.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/warn_on.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/qt.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/unix/thread.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/moc.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/shared.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/dll.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/resources.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/uic.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/yacc.prf \
-		../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/lex.prf \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtDeclarative.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtScript.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtCore.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtSvg.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtGui.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtSql.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtXmlPatterns.prl \
-		c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtNetwork.prl
-	$(QMAKE) -spec ../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/blackberry-armv7le-qcc CONFIG+=debug_and_release CONFIG+=device -o Makefile ../RetroArch-Cascades.pro
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/g++-base.conf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/g++-unix.conf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/unix.conf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/qcc-base.conf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/common/qcc-base-qnx.conf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/qconfig.pri:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/qt_functions.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/qt_config.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/qnx-armv7le-qcc/qmake.conf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/exclusive_builds.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/default_pre.prf:
-../config.pri:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/release.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/debug_and_release.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/default_post.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/cascades10.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/warn_on.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/qt.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/unix/thread.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/moc.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/shared.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/dll.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/resources.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/uic.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/yacc.prf:
-../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/features/lex.prf:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtDeclarative.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtScript.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtCore.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtSvg.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtGui.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtSql.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtXmlPatterns.prl:
-c:\bbndk\target_10_2_0_1155\qnx6\armle-v7\usr\lib\qt4\lib\libQtNetwork.prl:
+Makefile: 
+	$(QMAKE) -spec /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/blackberry-armv7le-qcc CONFIG+=debug_and_release CONFIG+=device -o Makefile ../RetroArch-Cascades.pro
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/common/g++-base.conf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/common/g++-unix.conf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/common/unix.conf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/common/qcc-base.conf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/common/qcc-base-qnx.conf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/qconfig.pri:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/qt_functions.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/qt_config.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/qnx-armv7le-qcc/qmake.conf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/exclusive_builds.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/default_pre.prf:
+# ../config.pri:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/release.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/debug_and_release.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/default_post.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/cascades10.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/warn_on.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/qt.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/unix/thread.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/moc.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/shared.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/dll.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/resources.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/uic.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/yacc.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/features/lex.prf:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtDeclarative.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtScript.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtCore.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtSvg.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtGui.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtSql.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtXmlPatterns.prl:
+# /opt/bbndk/target_10_3_0_698/qnx6/armle-v7/usr/lib/qt4/lib/libQtNetwork.prl:
 qmake: qmake_all FORCE
-	@$(QMAKE) -spec ../../../../bbndk/target_10_2_0_1155/qnx6/usr/share/qt4/mkspecs/blackberry-armv7le-qcc CONFIG+=debug_and_release CONFIG+=device -o Makefile ../RetroArch-Cascades.pro
+	@$(QMAKE) -spec /opt/bbndk/target_10_3_0_698/qnx6/usr/share/qt4/mkspecs/blackberry-armv7le-qcc CONFIG+=debug_and_release CONFIG+=device -o Makefile ../RetroArch-Cascades.pro
 
 qmake_all: FORCE
 

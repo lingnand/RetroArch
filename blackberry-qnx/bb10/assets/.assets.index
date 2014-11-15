@@ -1,11 +1,11 @@
 1
 9
-Controllers.qml
-General.qml
-images/file.png
-images/icon.png
-images/open.png
 images/search.png
-main.qml
+images/open.png
+images/icon.png
+images/file.png
 MainMenu.qml
+Controllers.qml
 VideoSettings.qml
+main.qml
+General.qml
