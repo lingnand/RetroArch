@@ -22,9 +22,9 @@
 
     <!-- Fourth digit segment of the package version. First three segments are taken from the
          <versionNumber> element.  Must be an integer from 0 to 2^16-1 -->
-    <buildId>9</buildId>
-    <author>Justin Tokarchuk</author>
-    <authorId>gYAAgPnNvvslFVmAHJwR3fmCPCc</authorId>
+    <buildId>10</buildId>
+    <author>LnStudio</author>
+    <authorId>gYAAgEwo-S63SGtk8c4hbsxlPhU</authorId>
 
     <!-- Description, displayed in the BlackBerry 10 application installer.
          May have multiple values for each language. See samples or xsd schema file. Optional. -->
@@ -81,7 +81,6 @@
 
     
     <!-- Bright theme is used for this application. --> 
-	<cascadesTheme>dark</cascadesTheme>
     
     <!-- Request permission to execute native code.  Required for native applications. -->
     <permission system="true">run_native</permission>
@@ -89,6 +88,7 @@
     <permission>use_gamepad</permission>
     <permission>read_device_identifying_information</permission>
     <env var="LD_LIBRARY_PATH" value="app/native/lib:/usr/lib/qt4/lib"/>
+    <env var="CASCADES_THEME" value="dark"/>
 
 
 </qnx>
