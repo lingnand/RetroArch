@@ -1,0 +1,3 @@
+[submodule "blackberry-qnx/bb10/cores/fba-libretro"]
+	path = blackberry-qnx/bb10/cores/fba-libretro
+	url = git://github.com/libretro/fba-libretro
